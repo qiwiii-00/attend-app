@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router, type Href } from "expo-router";
+import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -11,12 +11,11 @@ import {
   Switch,
   Text,
   TextInput,
-  ToastAndroid,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError } from "@/lib/api/apiClient";
-import { createUser } from "@/lib/api/user-service";
+import { getPostAuthRoute, useSession } from "@/lib/auth-context";
 
 type AuthMode = "login" | "register";
 
@@ -58,7 +57,12 @@ const registerFields: FieldProps[] = [
   },
 ];
 
+function showSuccessMessage(message: string) {
+  Alert.alert("Success", message);
+}
+
 export default function EntryScreen() {
+  const { signIn, signUp } = useSession();
   const [mode, setMode] = useState<AuthMode>("login");
   const [rememberMe, setRememberMe] = useState(true);
   const [visiblePasswords, setVisiblePasswords] = useState<
@@ -110,20 +114,12 @@ export default function EntryScreen() {
       return;
     }
 
-    if (isLogin) {
-      Alert.alert(
-        "Login unavailable",
-        "No login API exists yet. Add an auth endpoint in the backend before wiring login.",
-      );
-      return;
-    }
-
-    if (!confirmPassword.trim()) {
+    if (!isLogin && !confirmPassword.trim()) {
       Alert.alert("Missing fields", "Confirm password is required.");
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (!isLogin && password !== confirmPassword) {
       Alert.alert("Password mismatch", "Password and confirm password must match.");
       return;
     }
@@ -131,27 +127,46 @@ export default function EntryScreen() {
     try {
       setIsSubmitting(true);
 
-      const response = await createUser({
+      if (isLogin) {
+        const user = await signIn({
+          login: email.trim(),
+          password,
+          remember: rememberMe,
+        });
+
+        showSuccessMessage("Login successful");
+        router.replace(getPostAuthRoute(user));
+        return;
+      }
+
+      const user = await signUp({
         name: email.trim().split("@")[0] || "User",
         email: email.trim(),
         password,
+        remember: rememberMe,
       });
 
-      ToastAndroid.show("Registration successful", ToastAndroid.SHORT);
+      showSuccessMessage("Register successful");
       setPassword("");
       setConfirmPassword("");
-      router.replace(`/profile-reg?userId=${response.data.id}` as Href);
+      router.replace(getPostAuthRoute(user));
     } catch (error) {
       if (error instanceof ApiError) {
         const validationMessage = error.errors
           ? Object.values(error.errors).flat()[0]
           : undefined;
 
-        Alert.alert("Registration failed", validationMessage ?? error.message);
+        Alert.alert(
+          isLogin ? "Login failed" : "Registration failed",
+          validationMessage ?? error.message,
+        );
         return;
       }
 
-      Alert.alert("Registration failed", "Something went wrong. Try again.");
+      Alert.alert(
+        isLogin ? "Login failed" : "Registration failed",
+        "Something went wrong. Try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }

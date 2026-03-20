@@ -10,10 +10,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  ToastAndroid,
   View,
 } from "react-native";
 import { ApiError } from "@/lib/api/apiClient";
+import { useSession } from "@/lib/auth-context";
 import { SelectionSheetModal } from "@/components/selection-sheet-modal";
 import { getCourses, type Course } from "@/lib/api/course-service";
 import { getSemesters, type Semester } from "@/lib/api/semester-service";
@@ -26,7 +26,29 @@ const roleOptions = [
   "Receptionist",
 ] as const;
 
+function showSuccessMessage(message: string) {
+  Alert.alert("Success", message);
+}
+
+function normalizeListResponse<T>(value: unknown): T[] {
+  if (Array.isArray(value)) {
+    return value as T[];
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "data" in value &&
+    Array.isArray((value as { data?: unknown }).data)
+  ) {
+    return (value as { data: T[] }).data;
+  }
+
+  return [];
+}
+
 export default function ProfileCompleteScreen() {
+  const { syncUser } = useSession();
   const { userId } = useLocalSearchParams<{ userId?: string }>();
   const [user, setUser] = useState<User | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -61,8 +83,8 @@ export default function ProfileCompleteScreen() {
           ]);
 
         setUser(userResponse);
-        setCourses(courseResponse);
-        setSemesters(semesterResponse);
+        setCourses(normalizeListResponse<Course>(courseResponse));
+        setSemesters(normalizeListResponse<Semester>(semesterResponse));
         setName(userResponse.name ?? "");
         setStudentId(userResponse.student_id ?? "");
         setSelectedCourseId(userResponse.course_id ?? null);
@@ -126,9 +148,10 @@ export default function ProfileCompleteScreen() {
       });
 
       setUser(response.data);
+      syncUser(response.data);
 
-      ToastAndroid.show("Profile completed", ToastAndroid.SHORT);
-      router.replace("/home" as Href);
+      showSuccessMessage("Profile completed");
+      router.replace("/(tabs)/home" as Href);
     } catch (error) {
       if (error instanceof ApiError) {
         const validationMessage = error.errors

@@ -1,4 +1,4 @@
-import type { Course} from "@/lib/api/course-service";
+import type { Course } from "@/lib/api/course-service";
 import type { Semester } from "./semester-service";
 import { apiClient } from "@/lib/api/apiClient";
 
@@ -6,7 +6,10 @@ export type User = {
   id: number;
   name: string;
   email: string;
+  role?: string | null;
   student_id: string | null;
+  phone?: string | null;
+  roll_no?: string | null;
   course_id: number | null;
   semester_id: number | null;
   is_active: boolean;
@@ -21,7 +24,10 @@ export type SaveUserPayload = {
   name: string;
   email: string;
   password: string;
+  role?: string | null;
   student_id?: string | null;
+  phone?: string | null;
+  roll_no?: string | null;
   course_id?: number | null;
   semester_id?: number | null;
   is_active?: boolean;
