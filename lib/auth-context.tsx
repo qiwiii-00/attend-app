@@ -1,4 +1,12 @@
-import { type PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  type PropsWithChildren,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { ApiError } from "@/lib/api/apiClient";
 import {
@@ -26,7 +34,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function getPostAuthRoute(user: SessionUser) {
   if (!user.course_id || !user.semester_id) {
-    return `/profile-reg?userId=${user.id}` as const;
+    return "/profile-reg" as const;
   }
 
   return "/(tabs)/home" as const;
@@ -36,7 +44,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  async function refreshSession() {
+  const refreshSession = useCallback(async () => {
     try {
       const response = await me();
       setUser(response.data);
@@ -49,31 +57,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       throw error;
     }
-  }
+  }, []);
 
-  async function signIn(payload: LoginPayload) {
+  const signIn = useCallback(async (payload: LoginPayload) => {
     const response = await login(payload);
     setUser(response.data);
     return response.data;
-  }
+  }, []);
 
-  async function signUp(payload: RegisterPayload) {
+  const signUp = useCallback(async (payload: RegisterPayload) => {
     const response = await register(payload);
     setUser(response.data);
     return response.data;
-  }
+  }, []);
 
-  async function signOut() {
+  const signOut = useCallback(async () => {
     try {
       await logout();
     } finally {
       setUser(null);
     }
-  }
+  }, []);
 
-  function syncUser(nextUser: SessionUser | null) {
+  const syncUser = useCallback((nextUser: SessionUser | null) => {
     setUser(nextUser);
-  }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -111,7 +119,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       signOut,
       syncUser,
     }),
-    [isLoading, user],
+    [isLoading, refreshSession, signIn, signOut, signUp, syncUser, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

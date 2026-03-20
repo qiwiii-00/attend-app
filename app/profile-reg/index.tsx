@@ -1,30 +1,25 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router, type Href, useLocalSearchParams } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError } from "@/lib/api/apiClient";
 import { useSession } from "@/lib/auth-context";
 import { SelectionSheetModal } from "@/components/selection-sheet-modal";
 import { getCourses, type Course } from "@/lib/api/course-service";
 import { getSemesters, type Semester } from "@/lib/api/semester-service";
-import { getUser, updateUser, type User } from "@/lib/api/user-service";
+import { updateUser, type User } from "@/lib/api/user-service";
 
-const roleOptions = [
-  "Student",
-  "Teacher",
-  "Admin",
-  "Receptionist",
-] as const;
+const roleOptions = ["Student", "Teacher", "Admin", "Receptionist"] as const;
 
 function showSuccessMessage(message: string) {
   Alert.alert("Success", message);
@@ -48,8 +43,7 @@ function normalizeListResponse<T>(value: unknown): T[] {
 }
 
 export default function ProfileCompleteScreen() {
-  const { syncUser } = useSession();
-  const { userId } = useLocalSearchParams<{ userId?: string }>();
+  const { user: sessionUser, refreshSession, syncUser } = useSession();
   const [user, setUser] = useState<User | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -69,26 +63,29 @@ export default function ProfileCompleteScreen() {
 
   useEffect(() => {
     async function loadData() {
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
-
       try {
-        const [userResponse, courseResponse, semesterResponse] =
+        const [currentUser, courseResponse, semesterResponse] =
           await Promise.all([
-            getUser(userId),
+            sessionUser ? Promise.resolve(sessionUser) : refreshSession(),
             getCourses(),
             getSemesters(),
           ]);
 
-        setUser(userResponse);
+        if (!currentUser) {
+          setUser(null);
+          return;
+        }
+
+        setUser(currentUser);
         setCourses(normalizeListResponse<Course>(courseResponse));
         setSemesters(normalizeListResponse<Semester>(semesterResponse));
-        setName(userResponse.name ?? "");
-        setStudentId(userResponse.student_id ?? "");
-        setSelectedCourseId(userResponse.course_id ?? null);
-        setSelectedSemesterId(userResponse.semester_id ?? null);
+        setName(currentUser.name ?? "");
+        setStudentId(currentUser.student_id ?? "");
+        setSelectedRole(
+          roleOptions.find((role) => role === currentUser.role) ?? "Student",
+        );
+        setSelectedCourseId(currentUser.course_id ?? null);
+        setSelectedSemesterId(currentUser.semester_id ?? null);
       } catch (error) {
         const message =
           error instanceof ApiError
@@ -101,24 +98,31 @@ export default function ProfileCompleteScreen() {
     }
 
     loadData();
-  }, [userId]);
+  }, [refreshSession, sessionUser]);
 
   const availableSemesters = useMemo(() => {
     if (!selectedCourseId) {
       return [];
     }
 
-    return semesters.filter((semester) => semester.course_id === selectedCourseId);
+    return semesters.filter(
+      (semester) => semester.course_id === selectedCourseId,
+    );
   }, [selectedCourseId, semesters]);
 
-  const selectedCourse = courses.find((course) => course.id === selectedCourseId);
+  const selectedCourse = courses.find(
+    (course) => course.id === selectedCourseId,
+  );
   const selectedSemester = semesters.find(
     (semester) => semester.id === selectedSemesterId,
   );
 
   async function handleSave() {
-    if (!userId) {
-      Alert.alert("Missing user", "No registered user was found for this step.");
+    if (!user?.id) {
+      Alert.alert(
+        "Missing user",
+        "No registered user was found for this step.",
+      );
       return;
     }
 
@@ -140,8 +144,9 @@ export default function ProfileCompleteScreen() {
     try {
       setSaving(true);
 
-      const response = await updateUser(userId, {
+      const response = await updateUser(user.id, {
         name: name.trim(),
+        role: selectedRole,
         student_id: studentId.trim() || null,
         course_id: selectedCourseId,
         semester_id: selectedSemesterId,
@@ -179,13 +184,13 @@ export default function ProfileCompleteScreen() {
     );
   }
 
-  if (!userId) {
+  if (!user) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>Profile setup is unavailable</Text>
           <Text style={styles.emptyText}>
-            This screen only opens after a successful registration.
+            Sign in again to continue completing your profile.
           </Text>
           <Pressable
             style={styles.secondaryButton}
@@ -207,7 +212,9 @@ export default function ProfileCompleteScreen() {
       >
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>Profile Completion</Text>
-          <Text style={styles.title}>Finish setting up your student profile</Text>
+          <Text style={styles.title}>
+            Finish setting up your student profile
+          </Text>
           <Text style={styles.subtitle}>
             Add your details and choose your course and semester before entering
             the app.
@@ -321,7 +328,10 @@ export default function ProfileCompleteScreen() {
           </View>
 
           <Pressable
-            style={[styles.primaryButton, saving && styles.primaryButtonDisabled]}
+            style={[
+              styles.primaryButton,
+              saving && styles.primaryButtonDisabled,
+            ]}
             onPress={handleSave}
             disabled={saving}
           >

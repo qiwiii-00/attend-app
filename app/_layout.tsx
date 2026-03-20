@@ -8,6 +8,7 @@ import {
 import { Stack, useRootNavigationState, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { PropsWithChildren, useEffect } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
 import { AuthProvider, getPostAuthRoute, useSession } from "@/lib/auth-context";
@@ -60,13 +61,13 @@ function AppNavigator() {
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="profile-reg" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="profile-reg" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="modal"
-          options={{ presentation: "modal", title: "Modal" }}
+          options={{ headerShown: true, presentation: "modal", title: "Modal" }}
         />
       </Stack>
       <StatusBar style="auto" />
@@ -82,10 +83,12 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <AuthGate>
-        <AppNavigator />
-      </AuthGate>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AuthGate>
+          <AppNavigator />
+        </AuthGate>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

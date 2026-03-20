@@ -120,7 +120,10 @@ export default function EntryScreen() {
     }
 
     if (!isLogin && password !== confirmPassword) {
-      Alert.alert("Password mismatch", "Password and confirm password must match.");
+      Alert.alert(
+        "Password mismatch",
+        "Password and confirm password must match.",
+      );
       return;
     }
 
@@ -331,7 +334,11 @@ export default function EntryScreen() {
               disabled={isSubmitting}
             >
               <Text style={styles.primaryButtonText}>
-                {isSubmitting ? "Please wait..." : isLogin ? "Login" : "Register"}
+                {isSubmitting
+                  ? "Please wait..."
+                  : isLogin
+                    ? "Login"
+                    : "Register"}
               </Text>
             </Pressable>
           </ScrollView>
