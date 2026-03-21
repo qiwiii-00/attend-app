@@ -1,4 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -14,12 +16,22 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSession } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/apiClient";
+import { uploadAvatar } from "@/lib/api/cloudinary-service";
 import { getUser, type User } from "@/lib/api/user-service";
 
 type ProfileItem = {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
+};
+
+type ActionItem = {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  tint: string;
+  backgroundColor: string;
+  disabled?: boolean;
+  onPress?: () => void;
 };
 
 function formatValue(value?: string | number | null) {
@@ -41,11 +53,29 @@ function getInitials(name?: string | null) {
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
+function splitName(name?: string | null) {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length === 0) {
+    return { primary: "User", secondary: "" };
+  }
+
+  if (parts.length === 1) {
+    return { primary: parts[0], secondary: "" };
+  }
+
+  return {
+    primary: parts[0],
+    secondary: parts.slice(1).join(" "),
+  };
+}
+
 export default function ProfileTabScreen() {
-  const { user: sessionUser, signOut } = useSession();
+  const { user: sessionUser, signOut, syncUser } = useSession();
   const [user, setUser] = useState<User | null>(sessionUser);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
@@ -75,14 +105,14 @@ export default function ProfileTabScreen() {
   const profileItems = useMemo<ProfileItem[]>(
     () => [
       {
+        icon: "person-outline",
+        label: "Role",
+        value: formatValue(user?.role),
+      },
+      {
         icon: "mail-outline",
         label: "Email",
         value: formatValue(user?.email),
-      },
-      {
-        icon: "people-outline",
-        label: "Role",
-        value: formatValue(user?.role),
       },
       {
         icon: "card-outline",
@@ -103,6 +133,63 @@ export default function ProfileTabScreen() {
     [user],
   );
 
+  const displayName = user?.name ?? sessionUser?.name;
+  const { primary, secondary } = splitName(displayName);
+
+
+  async function handlePickAvatar() {
+    if (uploadingAvatar) {
+      return;
+    }
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission required",
+          "Allow photo library access to choose a profile image.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets?.length) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      setUploadingAvatar(true);
+      const response = await uploadAvatar({
+        uri: asset.uri,
+        name: asset.fileName ?? "avatar.jpg",
+        type: asset.mimeType ?? "image/jpeg",
+      });
+
+      setUser(response.data.user);
+      syncUser(response.data.user);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const validationMessage = error.errors
+          ? Object.values(error.errors).flat()[0]
+          : undefined;
+
+        Alert.alert("Upload failed", validationMessage ?? error.message);
+        return;
+      }
+
+      Alert.alert("Upload failed", "Unable to update your profile image.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
   async function handleLogout() {
     if (loggingOut) {
       return;
@@ -119,6 +206,25 @@ export default function ProfileTabScreen() {
     }
   }
 
+  const settingsItems: ActionItem[] = [
+    {
+      icon: "camera-outline",
+      label: uploadingAvatar ? "Uploading photo..." : "Change photo",
+      tint: "#C47B2B",
+      backgroundColor: "#FFF3E8",
+      disabled: uploadingAvatar,
+      onPress: handlePickAvatar,
+    },
+    {
+      icon: "log-out-outline",
+      label: loggingOut ? "Signing out..." : "Sign Out",
+      tint: "#1F4C9A",
+      backgroundColor: "#EEF4FF",
+      disabled: loggingOut,
+      onPress: handleLogout,
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView
@@ -126,70 +232,117 @@ export default function ProfileTabScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Profile</Text>
-            <Text style={styles.headerSubtitle}>Your account details</Text>
+        <View style={styles.container}>
+          <View style={styles.topBar}>
+            
+
+    
           </View>
 
           {loading ? (
             <View style={styles.loadingBlock}>
-              <ActivityIndicator size="large" color="#10B981" />
+              <ActivityIndicator size="large" color="#1F4C9A" />
               <Text style={styles.loadingText}>Loading profile...</Text>
             </View>
           ) : (
             <>
-              <View style={styles.profileBlock}>
-                <View style={styles.avatarWrap}>
+              <View style={styles.heroRow}>
+                <Pressable
+                  style={styles.avatarWrap}
+                  onPress={handlePickAvatar}
+                  disabled={uploadingAvatar}
+                >
                   <View style={styles.avatar}>
-                    <Text style={styles.avatarInitials}>
-                      {getInitials(user?.name ?? sessionUser?.name)}
-                    </Text>
+                    {user?.avatar_url ? (
+                      <Image
+                        source={{ uri: user.avatar_url }}
+                        style={styles.avatarImage}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <Text style={styles.avatarInitials}>
+                        {getInitials(displayName)}
+                      </Text>
+                    )}
+
+                    {uploadingAvatar ? (
+                      <View style={styles.avatarLoadingOverlay}>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      </View>
+                    ) : null}
                   </View>
                   <View style={styles.cameraBadge}>
-                    <Ionicons name="person-outline" size={12} color="#FFFFFF" />
+                    <Ionicons name="camera-outline" size={12} color="#FFFFFF" />
                   </View>
-                </View>
+                </Pressable>
 
-                <Text style={styles.name}>
-                  {formatValue(user?.name ?? sessionUser?.name)}
-                </Text>
+                
+              </View>
+
+              <View style={styles.nameBlock}>
+                <Text style={styles.primaryName}>{primary}</Text>
+                {secondary ? (
+                  <Text style={styles.secondaryName}>{secondary}</Text>
+                ) : null}
                 <Text style={styles.email}>
                   {formatValue(user?.email ?? sessionUser?.email)}
                 </Text>
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Account Information</Text>
+                <Text style={styles.sectionTitle}>Profile</Text>
 
                 {profileItems.map((item) => (
                   <View key={item.label} style={styles.itemRow}>
-                    <View style={styles.itemLeft}>
-                      <View style={styles.iconWrap}>
-                        <Ionicons name={item.icon} size={16} color="#0F172A" />
-                      </View>
-                      <View style={styles.itemTextBlock}>
-                        <Text style={styles.itemLabel}>{item.label}</Text>
-                        <Text style={styles.itemValue}>{item.value}</Text>
-                      </View>
+                    <View style={styles.itemIconWrap}>
+                      <Ionicons name={item.icon} size={18} color="#C47B2B" />
+                    </View>
+                    <View style={styles.itemTextBlock}>
+                      <Text style={styles.itemLabel}>{item.label}</Text>
+                      <Text style={styles.itemValue}>{item.value}</Text>
+                    </View>
+                    <View style={styles.chevronWrap}>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color="#9CA3AF"
+                      />
                     </View>
                   </View>
                 ))}
               </View>
 
-              <Pressable
-                style={[
-                  styles.logoutButton,
-                  loggingOut && styles.buttonDisabled,
-                ]}
-                onPress={handleLogout}
-                disabled={loggingOut}
-              >
-                <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.logoutButtonText}>
-                  {loggingOut ? "Logging out..." : "Logout"}
-                </Text>
-              </Pressable>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Settings</Text>
+
+                {settingsItems.map((item) => {
+                  return (
+                    <Pressable
+                      key={item.label}
+                      style={[styles.itemRow, item.disabled && styles.buttonDisabled]}
+                      onPress={item.onPress}
+                      disabled={item.disabled}
+                    >
+                      <View
+                        style={[
+                          styles.itemIconWrap,
+                          { backgroundColor: item.backgroundColor },
+                        ]}
+                      >
+                        <Ionicons name={item.icon} size={18} color={item.tint} />
+                      </View>
+                      <Text style={styles.settingsLabel}>{item.label}</Text>
+                      <View style={styles.chevronWrap}>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={16}
+                          color="#9CA3AF"
+                        />
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </>
           )}
         </View>
@@ -201,165 +354,162 @@ export default function ProfileTabScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#E8F4F1",
+    backgroundColor: "#FFFFFF",
   },
   screen: {
     flex: 1,
-    backgroundColor: "#E8F4F1",
+    backgroundColor: "#FFFFFF",
   },
   content: {
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 40,
   },
-  card: {
+  container: {
     width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 32,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 18,
-    shadowColor: "#6B8E87",
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
   },
-  header: {
-    gap: 4,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: "#6B7280",
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 28,
   },
   loadingBlock: {
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
-    paddingVertical: 56,
+    paddingVertical: 96,
   },
   loadingText: {
     fontSize: 15,
-    color: "#475569",
+    color: "#6B7280",
   },
-  profileBlock: {
+  heroRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 24,
+    justifyContent: "space-between",
   },
   avatarWrap: {
     position: "relative",
   },
   avatar: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: "#ECFDF5",
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
   },
   avatarInitials: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "800",
-    color: "#065F46",
+    color: "#1F2937",
+  },
+  avatarLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.35)",
   },
   cameraBadge: {
     position: "absolute",
-    right: 0,
-    bottom: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#10B981",
+    right: -2,
+    bottom: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#1F4C9A",
     borderWidth: 2,
     borderColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
-  name: {
-    marginTop: 14,
-    fontSize: 27,
-    fontWeight: "700",
-    color: "#171717",
-    textAlign: "center",
+  nameBlock: {
+    marginTop: 18,
+  },
+  primaryName: {
+    fontSize: 33,
+    lineHeight: 36,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  secondaryName: {
+    fontSize: 33,
+    lineHeight: 36,
+    fontWeight: "300",
+    color: "#9CA3AF",
   },
   email: {
-    marginTop: 4,
+    marginTop: 10,
     fontSize: 14,
     color: "#6B7280",
-    textAlign: "center",
   },
   section: {
-    marginTop: 28,
-    gap: 12,
+    marginTop: 34,
+    gap: 14,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 26,
     fontWeight: "700",
-    color: "#171717",
+    color: "#111827",
   },
   itemRow: {
-    minHeight: 68,
-    borderRadius: 16,
-    backgroundColor: "#F6F6F7",
+    minHeight: 64,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 14,
     paddingVertical: 12,
-    justifyContent: "center",
-  },
-  itemLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
-  iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#E2E8F0",
+  itemIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#FFF3E8",
     alignItems: "center",
     justifyContent: "center",
   },
   itemTextBlock: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   itemLabel: {
     fontSize: 13,
-    color: "#64748B",
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  itemValue: {
-    fontSize: 15,
-    color: "#18181B",
+    color: "#9CA3AF",
     fontWeight: "600",
   },
-  logoutButton: {
-    marginTop: 28,
-    minHeight: 54,
+  itemValue: {
+    fontSize: 14,
+    color: "#111827",
+    fontWeight: "600",
+  },
+  settingsLabel: {
+    flex: 1,
+    fontSize: 15,
+    color: "#111827",
+    fontWeight: "600",
+  },
+  chevronWrap: {
+    width: 28,
+    height: 28,
     borderRadius: 14,
-    backgroundColor: "#DC2626",
+    backgroundColor: "#F9FAFB",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: 10,
-    shadowColor: "#DC2626",
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
   },
   buttonDisabled: {
-    opacity: 0.7,
-  },
-  logoutButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
+    opacity: 0.65,
   },
 });

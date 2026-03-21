@@ -11,17 +11,19 @@ import {
   type BarcodeScanningResult,
   useCameraPermissions,
 } from "expo-camera";
-import { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { AppTheme } from "@/constants/theme";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSession } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/apiClient";
 import { getUser, type User } from "@/lib/api/user-service";
 
 type ScanOption = {
   title: string;
+  shortLabel: string;
   icon: typeof QrCode;
   tint: string;
   surface: string;
@@ -32,6 +34,7 @@ const scanOptions: ScanOption[] = [
   {
     title: "Tap here to scan QR code",
     icon: QrCode,
+    shortLabel: "Scan QR",
     tint: "#5CC9D6",
     surface: "#E8FBFD",
     action: "scan",
@@ -39,6 +42,7 @@ const scanOptions: ScanOption[] = [
   {
     title: "My Attendance",
     icon: Pencil,
+    shortLabel: "My attendance",
     tint: "#7AA7F6",
     surface: "#EEF4FF",
     action: "coming-soon",
@@ -46,6 +50,7 @@ const scanOptions: ScanOption[] = [
   {
     title: "Upcoming Class",
     icon: Clock,
+    shortLabel: "Schedule",
     tint: "#F2A8B7",
     surface: "#FFF1F4",
     action: "coming-soon",
@@ -53,23 +58,36 @@ const scanOptions: ScanOption[] = [
   {
     title: "Feedback",
     icon: Star,
+    shortLabel: "Feedback",
     tint: "#D3B15A",
     surface: "#FFF8E6",
     action: "coming-soon",
   },
 ];
 
+type Theme = (typeof AppTheme)["light"];
+
+function normalizeUserResponse(value: User | { data?: User } | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  if ("data" in value && value.data) {
+    return value.data;
+  }
+
+  return value;
+}
+
 export default function HomeTabScreen() {
   const { user: sessionUser } = useSession();
-  const colorScheme = useColorScheme() ?? "light";
-  const isDark = colorScheme === "dark";
+  const theme = useAppTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [user, setUser] = useState<User | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
   const [scannedValue, setScannedValue] = useState<string | null>(null);
-  const theme = isDark ? darkTheme : lightTheme;
-  const styles = getStyles(theme);
+  const styles = useMemo(() => getStyles(theme), [theme]);
 
   useEffect(() => {
     async function loadUser() {
@@ -80,7 +98,7 @@ export default function HomeTabScreen() {
 
       try {
         const response = await getUser(sessionUser.id);
-        setUser(response);
+        setUser(normalizeUserResponse(response));
       } catch (error) {
         if (error instanceof ApiError) {
           setUser(sessionUser);
@@ -140,7 +158,11 @@ export default function HomeTabScreen() {
                 style={styles.scannerCloseButton}
                 onPress={handleCloseScanner}
               >
-                <X size={18} color="#F8FAFC" strokeWidth={2.3} />
+                <X
+                  size={18}
+                  color={theme.colors.accentContrast}
+                  strokeWidth={2.3}
+                />
               </Pressable>
             </View>
 
@@ -155,7 +177,11 @@ export default function HomeTabScreen() {
               {!permission?.granted ? (
                 <View style={styles.resultCard}>
                   <View style={styles.permissionRow}>
-                    <CircleAlert size={18} color="#F59E0B" strokeWidth={2.2} />
+                    <CircleAlert
+                      size={18}
+                      color={theme.colors.accent}
+                      strokeWidth={2.2}
+                    />
                     <Text style={styles.resultTitle}>
                       Camera permission required
                     </Text>
@@ -211,217 +237,263 @@ export default function HomeTabScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <View style={styles.screen}>
-        <View style={styles.backgroundOrbTop} />
-        <View style={styles.backgroundOrbBottom} />
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.hero}>
 
-        <View style={styles.headerRow} />
-
-        <Text style={styles.title}>
-          Hello, {user?.name ?? sessionUser?.name ?? "User"}
-        </Text>
-
-        <View style={styles.grid}>
-          {scanOptions.map((option) => {
-            const Icon = option.icon;
-
-            return (
-              <Pressable
-                key={option.title}
-                style={styles.card}
-                onPress={() => handleCardPress(option)}
-              >
-                <View
-                  style={[
-                    styles.iconBadge,
-                    {
-                      backgroundColor: isDark
-                        ? `${option.tint}22`
-                        : option.surface,
-                    },
-                  ]}
-                >
-                  <Icon size={30} color={option.tint} strokeWidth={2.2} />
-                </View>
-                <Text style={styles.cardTitle}>{option.title}</Text>
-              </Pressable>
-            );
-          })}
+          <Text style={styles.balance}>
+           Hi, {user?.name ?? sessionUser?.name ?? "User"}
+            
+          </Text>
+          <Text style={styles.balanceLabel}>{user?.course?.title ?? "No course assigned"}, {user?.semester?.title ?? "No semester assigned"}</Text>
         </View>
-      </View>
+
+        <View style={styles.dashboardCard}>
+          <View style={styles.actionsGrid}>
+            {scanOptions.map((option) => {
+              const Icon = option.icon;
+
+              return (
+                <Pressable
+                  key={option.title}
+                  style={styles.actionItem}
+                  onPress={() => handleCardPress(option)}
+                >
+                  <View
+                    style={[
+                      styles.iconBadge,
+                      {
+                        backgroundColor:
+                          theme.colors.background === AppTheme.dark.colors.background
+                            ? `${option.tint}22`
+                            : option.surface,
+                      },
+                    ]}
+                  >
+                    <Icon size={40} color={option.tint} strokeWidth={2.2} />
+                  </View>
+                  <Text style={styles.actionLabel}>{option.title}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-const lightTheme = {
-  safeArea: "#CBEFF3",
-  screen: "#F4F8F2",
-  orb: "#CBEFF3",
-  title: "#111715",
-  card: "rgba(255,255,255,0.82)",
-  cardBorder: "rgba(223, 232, 227, 0.95)",
-  cardShadow: "#A9C9C4",
-  cardTitle: "#171D1C",
-  scannerSafeArea: "#050816",
-  scannerOverlay: "rgba(4, 10, 28, 0.28)",
-  scannerTitle: "#F8FAFC",
-  scannerCloseButton: "rgba(15, 23, 42, 0.6)",
-  scannerCloseBorder: "rgba(255,255,255,0.18)",
-  scannerFrame: "rgba(255,255,255,0.05)",
-  scannerFrameBorder: "rgba(255,255,255,0.12)",
-  scannerCorner: "#8CF5FF",
-  tipCard: "rgba(15, 23, 42, 0.7)",
-  tipCardBorder: "rgba(255,255,255,0.1)",
-  tipTitle: "#F8FAFC",
-  tipCopy: "#CBD5E1",
-  resultCard: "rgba(248, 250, 252, 0.95)",
-  resultTitle: "#0F172A",
-  resultLabel: "#475569",
-  resultValue: "#0F172A",
-  primaryButton: "#0F172A",
-  primaryButtonText: "#FFFFFF",
-  secondaryButton: "#E2E8F0",
-  secondaryButtonText: "#0F172A",
-};
-
-const darkTheme = {
-  safeArea: "#14313A",
-  screen: "#0D171C",
-  orb: "#14313A",
-  title: "#F3FBF7",
-  card: "rgba(17, 31, 36, 0.92)",
-  cardBorder: "rgba(97, 138, 145, 0.28)",
-  cardShadow: "#020617",
-  cardTitle: "#E6F2EF",
-  scannerSafeArea: "#020617",
-  scannerOverlay: "rgba(2, 6, 23, 0.42)",
-  scannerTitle: "#F8FAFC",
-  scannerCloseButton: "rgba(15, 23, 42, 0.82)",
-  scannerCloseBorder: "rgba(148,163,184,0.3)",
-  scannerFrame: "rgba(15, 23, 42, 0.22)",
-  scannerFrameBorder: "rgba(148,163,184,0.22)",
-  scannerCorner: "#8CF5FF",
-  tipCard: "rgba(15, 23, 42, 0.9)",
-  tipCardBorder: "rgba(148,163,184,0.18)",
-  tipTitle: "#F8FAFC",
-  tipCopy: "#CBD5E1",
-  resultCard: "rgba(15, 23, 42, 0.96)",
-  resultTitle: "#F8FAFC",
-  resultLabel: "#94A3B8",
-  resultValue: "#E2E8F0",
-  primaryButton: "#E2E8F0",
-  primaryButtonText: "#0F172A",
-  secondaryButton: "rgba(30, 41, 59, 0.95)",
-  secondaryButtonText: "#E2E8F0",
-};
-
-function getStyles(theme: typeof lightTheme) {
+function getStyles(theme: Theme) {
   return StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: theme.safeArea,
+      backgroundColor: theme.colors.background,
     },
     screen: {
       flex: 1,
-      backgroundColor: theme.screen,
-      paddingHorizontal: 20,
-      borderTopLeftRadius: 40,
-      position: "relative",
-      overflow: "hidden",
+      backgroundColor: theme.colors.background,
     },
-    backgroundOrbTop: {
-      position: "absolute",
-      top: -110,
-      right: -70,
-      width: 240,
-      height: 240,
-      borderRadius: 120,
-      backgroundColor: theme.orb,
+    content: {
+      paddingBottom: theme.spacing.xl,
     },
-    backgroundOrbBottom: {
-      position: "absolute",
-      bottom: -70,
-      left: -40,
-      width: 210,
-      height: 210,
-      borderRadius: 105,
-      backgroundColor: theme.orb,
+    hero: {
+      backgroundColor: theme.colors.accentStrong,
+      borderBottomLeftRadius: 34,
+      borderBottomRightRadius: 34,
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: 18,
+      paddingBottom: 94,
     },
-    headerRow: {
-      minHeight: 24,
-    },
-    title: {
-      marginTop: 28,
-      width: "84%",
-      fontSize: 36,
-      lineHeight: 42,
-      fontWeight: "800",
-      color: theme.title,
-      letterSpacing: -1.3,
-    },
-    subtitle: {
-      marginTop: 8,
+    greeting: {
       fontSize: 16,
-      lineHeight: 24,
-      fontWeight: "500",
-      color: theme.resultLabel,
+      lineHeight: 22,
+      color: theme.colors.accentContrast,
+      opacity: 0.9,
     },
-    grid: {
-      marginTop: 38,
+    balance: {
+      marginTop: 14,
+      fontSize: 36,
+      lineHeight: 40,
+      fontWeight: "800",
+      color: theme.colors.accentContrast,
+      letterSpacing: -1,
+    },
+    balanceLabel: {
+      marginTop: 4,
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.accentContrast,
+      opacity: 0.82,
+    },
+    dashboardCard: {
+      marginTop: -58,
+      marginHorizontal: theme.spacing.lg,
+
+    },
+    actionsGrid: {
       flexDirection: "row",
-      paddingVertical: 70,
       flexWrap: "wrap",
       justifyContent: "space-between",
-      alignItems: "center",
-      alignContent: "center",
-      rowGap: 14,
+      rowGap: 18,
     },
-    card: {
+    actionItem: {
+      backgroundColor: theme.colors.card,
+      shadowColor: "#1A1D27",
+      shadowOpacity: 0.1,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 4,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      borderRadius: 16,
       width: "48%",
-      minHeight: 166,
-      borderRadius: 24,
-      backgroundColor: theme.card,
-      paddingHorizontal: 16,
-      paddingVertical: 18,
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
-      shadowColor: theme.cardShadow,
-      shadowOpacity: 0.14,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 8 },
-      elevation: 3,
       alignItems: "center",
-      justifyContent: "center",
+      gap: 8,
     },
     iconBadge: {
-      width: 58,
-      height: 58,
-      borderRadius: 50,
+      width: 84,
+      height: 84,
+      borderRadius: 16,
       alignItems: "center",
       justifyContent: "center",
     },
-    cardTitle: {
-      marginTop: 28,
-      fontSize: 17,
-      lineHeight: 22,
-      fontWeight: "700",
-      color: theme.cardTitle,
-      letterSpacing: -0.3,
+    actionLabel: {
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: "500",
+      color: theme.colors.heading,
       textAlign: "center",
+    },
+    sectionBlock: {
+      marginTop: 26,
+      gap: 14,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    sectionTitle: {
+      fontSize: 19,
+      lineHeight: 24,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    moreLink: {
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: "600",
+      color: theme.colors.mutedText,
+    },
+    transactionsList: {
+      gap: 14,
+    },
+    transactionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    transactionIconWrap: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      backgroundColor: theme.colors.surfaceSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    transactionText: {
+      flex: 1,
+      gap: 1,
+    },
+    transactionSubtitle: {
+      fontSize: 12,
+      lineHeight: 16,
+      color: theme.colors.mutedText,
+    },
+    transactionTitle: {
+      fontSize: 14,
+      lineHeight: 18,
+      fontWeight: "700",
+      color: theme.colors.heading,
+    },
+    transactionAmount: {
+      fontSize: 14,
+      lineHeight: 18,
+      fontWeight: "800",
+    },
+    amountPositive: {
+      color: "#60B96B",
+    },
+    amountNegative: {
+      color: "#D96464",
+    },
+    promoCard: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      borderRadius: 20,
+      backgroundColor: theme.colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      overflow: "hidden",
+    },
+    promoMedia: {
+      width: 98,
+      minHeight: 90,
+      backgroundColor: "#111B4E",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 10,
+    },
+    promoBrand: {
+      fontSize: 22,
+      lineHeight: 24,
+      fontWeight: "800",
+      color: "#FFFFFF",
+    },
+    promoContent: {
+      flex: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      gap: 4,
+      justifyContent: "center",
+    },
+    promoTitle: {
+      fontSize: 15,
+      lineHeight: 19,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    promoSubtitle: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.colors.mutedText,
+    },
+    promoCta: {
+      marginTop: 6,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: "800",
+      color: theme.colors.accentStrong,
     },
     scannerSafeArea: {
       flex: 1,
-      backgroundColor: theme.scannerSafeArea,
+      backgroundColor: theme.colors.surface,
     },
     scannerScreen: {
       flex: 1,
-      backgroundColor: theme.scannerSafeArea,
+      backgroundColor: theme.colors.surface,
     },
     scannerOverlay: {
       flex: 1,
       justifyContent: "space-between",
-      backgroundColor: theme.scannerOverlay,
-      paddingHorizontal: 20,
+      backgroundColor:
+        theme.colors.background === AppTheme.dark.colors.background
+          ? "rgba(2, 6, 23, 0.42)"
+          : "rgba(4, 10, 28, 0.28)",
+      paddingHorizontal: theme.spacing.lg,
       paddingTop: 18,
       paddingBottom: 28,
     },
@@ -433,15 +505,21 @@ function getStyles(theme: typeof lightTheme) {
     scannerTitle: {
       fontSize: 20,
       fontWeight: "800",
-      color: theme.scannerTitle,
+      color: theme.colors.accentContrast,
     },
     scannerCloseButton: {
       width: 42,
       height: 42,
       borderRadius: 21,
-      backgroundColor: theme.scannerCloseButton,
+      backgroundColor:
+        theme.colors.background === AppTheme.dark.colors.background
+          ? "rgba(15, 23, 42, 0.82)"
+          : "rgba(15, 23, 42, 0.6)",
       borderWidth: 1,
-      borderColor: theme.scannerCloseBorder,
+      borderColor:
+        theme.colors.background === AppTheme.dark.colors.background
+          ? "rgba(148,163,184,0.3)"
+          : "rgba(255,255,255,0.18)",
       alignItems: "center",
       justifyContent: "center",
     },
@@ -450,15 +528,21 @@ function getStyles(theme: typeof lightTheme) {
       width: 252,
       height: 252,
       borderRadius: 28,
-      backgroundColor: theme.scannerFrame,
+      backgroundColor:
+        theme.colors.background === AppTheme.dark.colors.background
+          ? "rgba(15, 23, 42, 0.22)"
+          : "rgba(255,255,255,0.05)",
       borderWidth: 1,
-      borderColor: theme.scannerFrameBorder,
+      borderColor:
+        theme.colors.background === AppTheme.dark.colors.background
+          ? "rgba(148,163,184,0.22)"
+          : "rgba(255,255,255,0.12)",
     },
     corner: {
       position: "absolute",
       width: 36,
       height: 36,
-      borderColor: theme.scannerCorner,
+      borderColor: theme.colors.info,
     },
     cornerTopLeft: {
       top: 12,
@@ -492,26 +576,32 @@ function getStyles(theme: typeof lightTheme) {
       gap: 12,
     },
     tipCard: {
-      borderRadius: 24,
-      backgroundColor: theme.tipCard,
+      borderRadius: theme.radius.lg,
+      backgroundColor:
+        theme.colors.background === AppTheme.dark.colors.background
+          ? "rgba(15, 23, 42, 0.9)"
+          : "rgba(15, 23, 42, 0.7)",
       borderWidth: 1,
-      borderColor: theme.tipCardBorder,
+      borderColor:
+        theme.colors.background === AppTheme.dark.colors.background
+          ? "rgba(148,163,184,0.18)"
+          : "rgba(255,255,255,0.1)",
       padding: 18,
       gap: 6,
     },
     tipTitle: {
-      color: theme.tipTitle,
+      color: theme.colors.accentContrast,
       fontSize: 16,
       fontWeight: "800",
     },
     tipCopy: {
-      color: theme.tipCopy,
+      color: "#CBD5E1",
       fontSize: 14,
       lineHeight: 20,
     },
     resultCard: {
-      borderRadius: 24,
-      backgroundColor: theme.resultCard,
+      borderRadius: theme.radius.lg,
+      backgroundColor: theme.colors.card,
       padding: 18,
       gap: 12,
     },
@@ -521,19 +611,19 @@ function getStyles(theme: typeof lightTheme) {
       gap: 8,
     },
     resultTitle: {
-      color: theme.resultTitle,
+      color: theme.colors.heading,
       fontSize: 16,
       fontWeight: "800",
     },
     resultLabel: {
-      color: theme.resultLabel,
+      color: theme.colors.mutedText,
       fontSize: 13,
       fontWeight: "700",
       textTransform: "uppercase",
       letterSpacing: 0.8,
     },
     resultValue: {
-      color: theme.resultValue,
+      color: theme.colors.text,
       fontSize: 15,
       lineHeight: 22,
       fontWeight: "600",
@@ -546,13 +636,13 @@ function getStyles(theme: typeof lightTheme) {
       flex: 1,
       minHeight: 48,
       borderRadius: 999,
-      backgroundColor: theme.primaryButton,
+      backgroundColor: theme.colors.accentStrong,
       alignItems: "center",
       justifyContent: "center",
       paddingHorizontal: 16,
     },
     primaryButtonText: {
-      color: theme.primaryButtonText,
+      color: theme.colors.accentContrast,
       fontSize: 15,
       fontWeight: "800",
     },
@@ -560,13 +650,13 @@ function getStyles(theme: typeof lightTheme) {
       flex: 1,
       minHeight: 48,
       borderRadius: 999,
-      backgroundColor: theme.secondaryButton,
+      backgroundColor: theme.colors.surfaceMuted,
       alignItems: "center",
       justifyContent: "center",
       paddingHorizontal: 16,
     },
     secondaryButtonText: {
-      color: theme.secondaryButtonText,
+      color: theme.colors.heading,
       fontSize: 15,
       fontWeight: "800",
     },
