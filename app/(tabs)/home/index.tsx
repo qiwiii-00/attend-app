@@ -1,7 +1,7 @@
 import {
   CircleAlert,
-  Clock,
-  Pencil,
+  Clock3,
+  GraduationCap,
   QrCode,
   Star,
   X,
@@ -11,14 +11,22 @@ import {
   type BarcodeScanningResult,
   useCameraPermissions,
 } from "expo-camera";
+import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { WeeklyReportCard } from "@/components/weekly-report-card";
 import { AppTheme } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSession } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/apiClient";
+import {
+  getAttendances,
+  scanStatic,
+  type AttendanceRecord,
+} from "@/lib/api/attendance-service";
+import { getPeriods, type PeriodRecord } from "@/lib/api/period-service";
 import { getUser, type User } from "@/lib/api/user-service";
 
 type ScanOption = {
@@ -27,40 +35,49 @@ type ScanOption = {
   icon: typeof QrCode;
   tint: string;
   surface: string;
-  action: "scan" | "coming-soon";
+  action: "scan" | "attendance" | "upcoming-class" | "coming-soon";
+};
+
+type WeeklyBar = {
+  key: string;
+  label: string;
+  value: number;
+  attended: number;
+  total: number;
+  isToday: boolean;
 };
 
 const scanOptions: ScanOption[] = [
   {
-    title: "Tap here to scan QR code",
-    icon: QrCode,
+    title: "scan here",
     shortLabel: "Scan QR",
-    tint: "#5CC9D6",
-    surface: "#E8FBFD",
+    icon: QrCode,
+    tint: "#111111",
+    surface: "#DCE2FF",
     action: "scan",
   },
   {
     title: "My Attendance",
-    icon: Pencil,
     shortLabel: "My attendance",
-    tint: "#7AA7F6",
-    surface: "#EEF4FF",
-    action: "coming-soon",
+    icon: GraduationCap,
+    tint: "#111111",
+    surface: "#6E8FD6",
+    action: "attendance",
   },
   {
-    title: "Upcoming Class",
-    icon: Clock,
+    title: "Upcoming class",
     shortLabel: "Schedule",
-    tint: "#F2A8B7",
-    surface: "#FFF1F4",
-    action: "coming-soon",
+    icon: Clock3,
+    tint: "#111111",
+    surface: "#FFFFFF",
+    action: "upcoming-class",
   },
   {
     title: "Feedback",
-    icon: Star,
     shortLabel: "Feedback",
-    tint: "#D3B15A",
-    surface: "#FFF8E6",
+    icon: Star,
+    tint: "#111111",
+    surface: "#9AB4F0",
     action: "coming-soon",
   },
 ];
@@ -79,63 +96,235 @@ function normalizeUserResponse(value: User | { data?: User } | null | undefined)
   return value;
 }
 
+function getShortName(name?: string | null) {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  return parts[0] || "User";
+}
+
+function getWeekdayIndex(date: Date) {
+  const day = date.getDay();
+  return day === 0 ? 6 : day - 1;
+}
+
+function getStartOfWeek(date: Date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - getWeekdayIndex(start));
+  return start;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function getAttendanceDate(attendance: AttendanceRecord) {
+  const value = attendance.scanned_at ?? attendance.created_at;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function sortPeriods(periods: PeriodRecord[]) {
+  return [...periods].sort((left, right) =>
+    left.start_time.localeCompare(right.start_time),
+  );
+}
+
+function buildWeeklyBars(attendances: AttendanceRecord[], periods: PeriodRecord[]) {
+  const labels = ["M", "T", "W", "T", "F"];
+  const today = new Date();
+  const startOfWeek = getStartOfWeek(today);
+  const orderedPeriods = sortPeriods(periods);
+  const periodOrderMap = new Map(
+    orderedPeriods.map((period, index) => [period.id, index + 1]),
+  );
+
+  return labels.map((label, index) => {
+    const dayStart = addDays(startOfWeek, index);
+    dayStart.setHours(0, 0, 0, 0);
+
+    const dayEnd = new Date(dayStart);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const dayAttendances = attendances.filter((attendance) => {
+      const date = getAttendanceDate(attendance);
+      return date ? date >= dayStart && date <= dayEnd : false;
+    });
+
+    const periodNumbers = new Set(
+      dayAttendances
+        .map((attendance) => attendance.session?.period_id)
+        .filter((periodId): periodId is number => typeof periodId === "number")
+        .map((periodId) => periodOrderMap.get(periodId) ?? periodId),
+    );
+
+    const attended = dayAttendances.filter(
+      (attendance) => attendance.status === "present" || attendance.status === "late",
+    ).length;
+
+    return {
+      key: `${label}-${index}`,
+      label,
+      value: periodNumbers.size,
+      attended,
+      total: dayAttendances.length,
+      isToday: getWeekdayIndex(today) === index,
+    } satisfies WeeklyBar;
+  });
+}
+
+function getWeeklySummary(bars: WeeklyBar[]) {
+  return bars.reduce(
+    (summary, bar) => {
+      summary.attended += bar.attended;
+      summary.total += bar.total;
+      return summary;
+    },
+    { attended: 0, total: 0 },
+  );
+}
+
 export default function HomeTabScreen() {
   const { user: sessionUser } = useSession();
   const theme = useAppTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [user, setUser] = useState<User | null>(null);
+  const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
+  const [periods, setPeriods] = useState<PeriodRecord[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
   const [scannedValue, setScannedValue] = useState<string | null>(null);
+  const [isSubmittingScan, setIsSubmittingScan] = useState(false);
+  const [scanResultMessage, setScanResultMessage] = useState<string | null>(null);
   const styles = useMemo(() => getStyles(theme), [theme]);
 
   useEffect(() => {
-    async function loadUser() {
+    async function loadHomeData() {
       if (!sessionUser?.id) {
         setUser(null);
+        setAttendances([]);
+        setPeriods([]);
         return;
       }
 
       try {
-        const response = await getUser(sessionUser.id);
-        setUser(normalizeUserResponse(response));
+        const [userResponse, attendanceResponse, periodResponse] = await Promise.all([
+          getUser(sessionUser.id),
+          getAttendances(),
+          getPeriods(),
+        ]);
+
+        const currentUser = normalizeUserResponse(userResponse);
+        setUser(currentUser);
+        setAttendances(
+          attendanceResponse.data.filter(
+            (attendance) => attendance.user_id === sessionUser.id,
+          ),
+        );
+        setPeriods(
+          periodResponse.data.filter(
+            (period) =>
+              period.course_id === currentUser?.course_id &&
+              period.semester_id === currentUser?.semester_id,
+          ),
+        );
       } catch (error) {
+        setUser(sessionUser);
+
         if (error instanceof ApiError) {
-          setUser(sessionUser);
           return;
         }
 
-        setUser(sessionUser);
+        Alert.alert("Load failed", "Unable to load your attendance summary.");
       }
     }
 
-    loadUser();
+    loadHomeData();
   }, [sessionUser]);
 
-  function handleCardPress(option: ScanOption) {
-    if (option.action !== "scan") {
-      Alert.alert("Coming soon", `${option.title} is not implemented yet.`);
+  const weeklyBars = useMemo(
+    () => buildWeeklyBars(attendances, periods),
+    [attendances, periods],
+  );
+  const weeklySummary = useMemo(
+    () => getWeeklySummary(weeklyBars),
+    [weeklyBars],
+  );
+  const weeklySummaryText =
+    weeklySummary.total > 0
+      ? `${weeklySummary.attended}/${weeklySummary.total} classes marked this week`
+      : "No attendance recorded this week yet";
+  const totalPeriodsForScale = Math.max(periods.length, 1);
+
+  async function refreshAttendances() {
+    if (!sessionUser?.id) {
       return;
     }
 
-    setScannedValue(null);
-    setHasScanned(false);
-    setScannerOpen(true);
+    const attendanceResponse = await getAttendances();
+    setAttendances(
+      attendanceResponse.data.filter(
+        (attendance) => attendance.user_id === sessionUser.id,
+      ),
+    );
+  }
+
+  function handleCardPress(option: ScanOption) {
+    if (option.action === "scan") {
+      setScannedValue(null);
+      setHasScanned(false);
+      setScanResultMessage(null);
+      setScannerOpen(true);
+      return;
+    }
+
+    if (option.action === "attendance") {
+      router.push("/attendance");
+      return;
+    }
+
+    if (option.action === "upcoming-class") {
+      router.push("/upcoming-class");
+      return;
+    }
+
+    Alert.alert("Coming soon", `${option.title} is not implemented yet.`);
   }
 
   function handleCloseScanner() {
     setScannerOpen(false);
     setHasScanned(false);
     setScannedValue(null);
+    setScanResultMessage(null);
+    setIsSubmittingScan(false);
   }
 
-  function handleBarcodeScanned(result: BarcodeScanningResult) {
-    if (hasScanned) {
+  async function handleBarcodeScanned(result: BarcodeScanningResult) {
+    if (hasScanned || isSubmittingScan) {
       return;
     }
 
-    setHasScanned(true);
-    setScannedValue(result.data);
+    try {
+      setHasScanned(true);
+      setIsSubmittingScan(true);
+      setScannedValue(result.data);
+
+      const response = await scanStatic({
+        token: result.data,
+        device_id: "mobile-app",
+      });
+
+      setScanResultMessage(response.message);
+      await refreshAttendances();
+    } catch (error) {
+      const message =
+        error instanceof ApiError ? error.message : "Unable to mark attendance.";
+
+      setScanResultMessage(message);
+    } finally {
+      setIsSubmittingScan(false);
+    }
   }
 
   if (scannerOpen) {
@@ -196,16 +385,26 @@ export default function HomeTabScreen() {
                     <Text style={styles.primaryButtonText}>Allow Camera</Text>
                   </Pressable>
                 </View>
+              ) : isSubmittingScan ? (
+                <View style={styles.resultCard}>
+                  <Text style={styles.resultLabel}>Scanning</Text>
+                  <Text style={styles.resultValue}>
+                    Validating QR token and marking attendance.
+                  </Text>
+                </View>
               ) : scannedValue ? (
                 <View style={styles.resultCard}>
-                  <Text style={styles.resultLabel}>Scanned QR value</Text>
-                  <Text style={styles.resultValue}>{scannedValue}</Text>
+                  <Text style={styles.resultLabel}>Scan result</Text>
+                  <Text style={styles.resultValue}>
+                    {scanResultMessage ?? scannedValue}
+                  </Text>
                   <View style={styles.resultActions}>
                     <Pressable
                       style={styles.secondaryButton}
                       onPress={() => {
                         setHasScanned(false);
                         setScannedValue(null);
+                        setScanResultMessage(null);
                       }}
                     >
                       <Text style={styles.secondaryButtonText}>Scan Again</Text>
@@ -242,44 +441,40 @@ export default function HomeTabScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
-
-          <Text style={styles.balance}>
-           Hi, {user?.name ?? sessionUser?.name ?? "User"}
-            
+        <View style={styles.headerBlock}>
+          <Text style={styles.helloTitle}>Hello, {getShortName(user?.name ?? sessionUser?.name)}</Text>
+          <Text style={styles.courseMeta}>
+            {user?.course?.title ?? "No course assigned"} {user?.semester?.title ?? ""}
           </Text>
-          <Text style={styles.balanceLabel}>{user?.course?.title ?? "No course assigned"}, {user?.semester?.title ?? "No semester assigned"}</Text>
         </View>
 
-        <View style={styles.dashboardCard}>
-          <View style={styles.actionsGrid}>
-            {scanOptions.map((option) => {
-              const Icon = option.icon;
+        <WeeklyReportCard
+          bars={weeklyBars}
+          summaryText={weeklySummaryText}
+          maxValue={totalPeriodsForScale}
+        />
 
-              return (
-                <Pressable
-                  key={option.title}
-                  style={styles.actionItem}
-                  onPress={() => handleCardPress(option)}
-                >
-                  <View
-                    style={[
-                      styles.iconBadge,
-                      {
-                        backgroundColor:
-                          theme.colors.background === AppTheme.dark.colors.background
-                            ? `${option.tint}22`
-                            : option.surface,
-                      },
-                    ]}
-                  >
-                    <Icon size={40} color={option.tint} strokeWidth={2.2} />
-                  </View>
-                  <Text style={styles.actionLabel}>{option.title}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+        <View style={styles.actionsGrid}>
+          {scanOptions.map((option) => {
+            const Icon = option.icon;
+
+            return (
+              <Pressable
+                key={option.title}
+                style={[
+                  styles.actionItem,
+                  { backgroundColor: option.surface },
+                  option.title === "Upcoming class" && styles.lightActionItem,
+                ]}
+                onPress={() => handleCardPress(option)}
+              >
+                <View style={styles.actionIconWrap}>
+                  <Icon size={42} color={option.tint} strokeWidth={2.2} />
+                </View>
+                <Text style={styles.actionTitle}>{option.title}</Text>
+              </Pressable>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -290,193 +485,71 @@ function getStyles(theme: Theme) {
   return StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "#FFFFFF",
     },
     screen: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: "#FFFFFF",
     },
     content: {
-      paddingBottom: theme.spacing.xl,
+      paddingHorizontal: 22,
+      paddingTop: 10,
+      paddingBottom: 34,
     },
-    hero: {
-      backgroundColor: theme.colors.accentStrong,
-      borderBottomLeftRadius: 34,
-      borderBottomRightRadius: 34,
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: 18,
-      paddingBottom: 94,
+    headerBlock: {
+      gap: 6,
+      marginBottom: 18,
     },
-    greeting: {
-      fontSize: 16,
-      lineHeight: 22,
-      color: theme.colors.accentContrast,
-      opacity: 0.9,
-    },
-    balance: {
-      marginTop: 14,
-      fontSize: 36,
-      lineHeight: 40,
+    helloTitle: {
+      fontSize: 28,
+      lineHeight: 34,
       fontWeight: "800",
-      color: theme.colors.accentContrast,
-      letterSpacing: -1,
+      color: "#111111",
     },
-    balanceLabel: {
-      marginTop: 4,
-      fontSize: 14,
-      lineHeight: 20,
-      color: theme.colors.accentContrast,
-      opacity: 0.82,
-    },
-    dashboardCard: {
-      marginTop: -58,
-      marginHorizontal: theme.spacing.lg,
-
+    courseMeta: {
+      fontSize: 15,
+      lineHeight: 21,
+      color: "#3B3B3B",
     },
     actionsGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      justifyContent: "space-between",
-      rowGap: 18,
+      rowGap: 10,
+      columnGap: 10,
+      marginTop: 18,
+      justifyContent: "center",
     },
     actionItem: {
-      backgroundColor: theme.colors.card,
-      shadowColor: "#1A1D27",
-      shadowOpacity: 0.1,
-      shadowRadius: 20,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 4,
-      paddingVertical: 14,
-      paddingHorizontal: 12,
-      borderRadius: 16,
       width: "48%",
-      alignItems: "center",
-      gap: 8,
-    },
-    iconBadge: {
-      width: 84,
-      height: 84,
-      borderRadius: 16,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    actionLabel: {
-      fontSize: 12,
-      lineHeight: 16,
-      fontWeight: "500",
-      color: theme.colors.heading,
-      textAlign: "center",
-    },
-    sectionBlock: {
-      marginTop: 26,
-      gap: 14,
-    },
-    sectionHeader: {
-      flexDirection: "row",
+      height: 130,
+      borderRadius: 20,
+      paddingHorizontal: 10,
+      paddingVertical: 18,
       alignItems: "center",
       justifyContent: "space-between",
+      shadowColor: "#000000",
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 5 },
+      elevation: 3,
     },
-    sectionTitle: {
-      fontSize: 19,
-      lineHeight: 24,
-      fontWeight: "800",
-      color: theme.colors.heading,
-    },
-    moreLink: {
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: "600",
-      color: theme.colors.mutedText,
-    },
-    transactionsList: {
-      gap: 14,
-    },
-    transactionRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-    },
-    transactionIconWrap: {
-      width: 34,
-      height: 34,
-      borderRadius: 10,
-      backgroundColor: theme.colors.surfaceSoft,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    transactionText: {
-      flex: 1,
-      gap: 1,
-    },
-    transactionSubtitle: {
-      fontSize: 12,
-      lineHeight: 16,
-      color: theme.colors.mutedText,
-    },
-    transactionTitle: {
-      fontSize: 14,
-      lineHeight: 18,
-      fontWeight: "700",
-      color: theme.colors.heading,
-    },
-    transactionAmount: {
-      fontSize: 14,
-      lineHeight: 18,
-      fontWeight: "800",
-    },
-    amountPositive: {
-      color: "#60B96B",
-    },
-    amountNegative: {
-      color: "#D96464",
-    },
-    promoCard: {
-      flexDirection: "row",
-      alignItems: "stretch",
-      borderRadius: 20,
-      backgroundColor: theme.colors.surfaceElevated,
+    lightActionItem: {
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      overflow: "hidden",
+      borderColor: "#E5E5E5",
     },
-    promoMedia: {
-      width: 98,
-      minHeight: 90,
-      backgroundColor: "#111B4E",
+    actionIconWrap: {
+      width: 58,
+      height: 58,
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: 10,
+      position: "relative",
     },
-    promoBrand: {
-      fontSize: 22,
-      lineHeight: 24,
-      fontWeight: "800",
-      color: "#FFFFFF",
-    },
-    promoContent: {
-      flex: 1,
-      paddingHorizontal: 12,
-      paddingVertical: 12,
-      gap: 4,
-      justifyContent: "center",
-    },
-    promoTitle: {
-      fontSize: 15,
-      lineHeight: 19,
-      fontWeight: "800",
-      color: theme.colors.heading,
-    },
-    promoSubtitle: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: theme.colors.mutedText,
-    },
-    promoCta: {
-      marginTop: 6,
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: "800",
-      color: theme.colors.accentStrong,
+    actionTitle: {
+      fontSize: 14,
+      lineHeight: 20,
+      fontWeight: "700",
+      color: "#111111",
+      textAlign: "center",
     },
     scannerSafeArea: {
       flex: 1,

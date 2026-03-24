@@ -210,8 +210,8 @@ export default function ProfileTabScreen() {
     {
       icon: "camera-outline",
       label: uploadingAvatar ? "Uploading photo..." : "Change photo",
-      tint: "#C47B2B",
-      backgroundColor: "#FFF3E8",
+      tint: "#1F4C9A",
+      backgroundColor: "#EEF4FF",
       disabled: uploadingAvatar,
       onPress: handlePickAvatar,
     },
@@ -295,7 +295,7 @@ export default function ProfileTabScreen() {
                 {profileItems.map((item) => (
                   <View key={item.label} style={styles.itemRow}>
                     <View style={styles.itemIconWrap}>
-                      <Ionicons name={item.icon} size={18} color="#C47B2B" />
+                      <Ionicons name={item.icon} size={18} color="#1F4C9A" />
                     </View>
                     <View style={styles.itemTextBlock}>
                       <Text style={styles.itemLabel}>{item.label}</Text>
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: "#FFF3E8",
+    backgroundColor: "#EEF4FF",
     alignItems: "center",
     justifyContent: "center",
   },
