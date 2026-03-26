@@ -17,8 +17,8 @@ import { useSession } from "@/lib/auth-context";
 import {
   getPeriodsByContext,
   type PeriodRecord,
-  type PeriodSubjectRecord,
 } from "@/lib/api/period-service";
+import { getSubjects, type SubjectRecord } from "@/lib/api/subject-service";
 
 type DayOption = {
   key: string;
@@ -111,17 +111,23 @@ function getWeekdayKey(date: Date) {
   return WEEKDAY_KEYS[date.getDay()];
 }
 
-function getSubjectForDate(period: PeriodRecord, date: Date) {
-  const subjects = period.subjects ?? [];
+function getSubjectForDate(
+  period: PeriodRecord,
+  subjects: SubjectRecord[],
+  date: Date,
+) {
   const weekday = getWeekdayKey(date);
 
   return subjects.find((subject) => subject.day_of_week === weekday)
     ?? subjects.find((subject) => subject.day_of_week === null)
-    ?? period.subject
     ?? undefined;
 }
 
-function getScheduleState(period: PeriodRecord, subject: PeriodSubjectRecord | undefined, date: Date) {
+function getScheduleState(
+  period: PeriodRecord,
+  subject: SubjectRecord | undefined,
+  date: Date,
+) {
   if (!subject || !subject.is_active || !period.is_active) {
     return "inactive" as const;
   }
@@ -139,10 +145,21 @@ function getScheduleState(period: PeriodRecord, subject: PeriodSubjectRecord | u
   return nowMinutes >= toMinutes(period.end_time) ? "done" : "upcoming";
 }
 
-function buildSchedule(periods: PeriodRecord[], selectedDate: Date) {
+function buildSchedule(
+  periods: PeriodRecord[],
+  subjects: SubjectRecord[],
+  selectedDate: Date,
+) {
   return sortPeriods(periods)
     .map((period) => {
-      const subject = getSubjectForDate(period, selectedDate);
+      const matchingSubjects = subjects.filter(
+        (subject) =>
+          subject.period_id === period.id &&
+          subject.course_id === period.course_id &&
+          subject.semester_id === period.semester_id,
+      );
+
+      const subject = getSubjectForDate(period, matchingSubjects, selectedDate);
 
       if (!subject || !subject.is_active || !period.is_active) {
         return null;
@@ -196,6 +213,7 @@ export default function UpcomingClassScreen() {
   const [selectedDayKey, setSelectedDayKey] = useState(weekDays[0]?.key ?? "");
   const [loading, setLoading] = useState(true);
   const [periods, setPeriods] = useState<PeriodRecord[]>([]);
+  const [subjects, setSubjects] = useState<SubjectRecord[]>([]);
 
   useEffect(() => {
     async function loadSchedule() {
@@ -203,15 +221,28 @@ export default function UpcomingClassScreen() {
 
       if (!user?.id) {
         setPeriods([]);
+        setSubjects([]);
         setLoading(false);
         return;
       }
 
       try {
-        const periodResponse = await getPeriodsByContext({ user_id: user.id });
+        const [periodResponse, subjectResponse] = await Promise.all([
+          getPeriodsByContext({ user_id: user.id }),
+          getSubjects(),
+        ]);
+
         setPeriods(periodResponse.data.periods);
+        setSubjects(
+          subjectResponse.data.filter(
+            (subject) =>
+              subject.course_id === user.course_id &&
+              subject.semester_id === user.semester_id,
+          ),
+        );
       } catch (error) {
         setPeriods([]);
+        setSubjects([]);
         const message =
           error instanceof ApiError ? error.message : "Unable to load class schedule.";
         Alert.alert("Load failed", message);
@@ -233,8 +264,8 @@ export default function UpcomingClassScreen() {
       return [];
     }
 
-    return buildSchedule(periods, selectedDay.date);
-  }, [periods, selectedDay]);
+    return buildSchedule(periods, subjects, selectedDay.date);
+  }, [periods, selectedDay, subjects]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>

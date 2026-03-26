@@ -1,6 +1,12 @@
 import type { Course } from "@/lib/api/course-service";
 import { apiClient } from "@/lib/api/apiClient";
 
+export const SEMESTER_API_ROUTES = {
+  semesters: "/semesters",
+  semesterById: (id: number | string) => `/semesters/${id}`,
+  semesterQr: (id: number | string) => `/semesters/${id}/qr`,
+} as const;
+
 export type Semester = {
   id: number;
   course_id: number;
@@ -23,40 +29,78 @@ export type SaveSemesterPayload = {
 
 export type UpdateSemesterPayload = Partial<SaveSemesterPayload>;
 
-export type SemesterMutationResponse = {
-  message: string;
-  data: Semester;
+export type SemesterQrData = {
+  semester_id: number;
+  title: string;
+  token: string;
+  qr_image_url: string;
 };
 
-export type SemesterDeleteResponse = {
+export type SemesterApiResponse<TData> = {
+  success: boolean;
   message: string;
+  data: TData;
+  errors?: Record<string, string[]> | null;
+};
+
+export type SemesterMutationResponse = SemesterApiResponse<Semester>;
+
+export type SemesterDeleteResponse = SemesterApiResponse<null>;
+
+const sessionRequestOptions = {
+  credentials: "include" as const,
 };
 
 export const semesterService = {
   getSemesters() {
-    return apiClient.get<Semester[]>("/semesters");
+    return apiClient.get<SemesterApiResponse<Semester[]>>(
+      SEMESTER_API_ROUTES.semesters,
+      sessionRequestOptions,
+    );
   },
 
   getSemester(id: number | string) {
-    return apiClient.get<Semester>(`/semesters/${id}`);
+    return apiClient.get<SemesterApiResponse<Semester>>(
+      SEMESTER_API_ROUTES.semesterById(id),
+      sessionRequestOptions,
+    );
+  },
+
+  getSemesterQr(id: number | string) {
+    return apiClient.get<SemesterApiResponse<SemesterQrData>>(
+      SEMESTER_API_ROUTES.semesterQr(id),
+      sessionRequestOptions,
+    );
   },
 
   createSemester(payload: SaveSemesterPayload) {
-    return apiClient.post<SemesterMutationResponse>("/semesters", payload);
+    return apiClient.post<SemesterMutationResponse>(
+      SEMESTER_API_ROUTES.semesters,
+      payload,
+      sessionRequestOptions,
+    );
   },
 
   updateSemester(id: number | string, payload: UpdateSemesterPayload) {
-    return apiClient.put<SemesterMutationResponse>(`/semesters/${id}`, payload);
+    return apiClient.put<SemesterMutationResponse>(
+      SEMESTER_API_ROUTES.semesterById(id),
+      payload,
+      sessionRequestOptions,
+    );
   },
 
   deleteSemester(id: number | string) {
-    return apiClient.delete<SemesterDeleteResponse>(`/semesters/${id}`);
+    return apiClient.delete<SemesterDeleteResponse>(
+      SEMESTER_API_ROUTES.semesterById(id),
+      sessionRequestOptions,
+    );
   },
 };
 
 export const {
   getSemesters,
   getSemester,
+  getSemesterQr,
   createSemester,
   updateSemester,
   deleteSemester,

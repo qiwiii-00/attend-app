@@ -23,10 +23,10 @@ import { useSession } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/apiClient";
 import {
   getAttendances,
-  scanStatic,
   type AttendanceRecord,
 } from "@/lib/api/attendance-service";
 import { getPeriods, type PeriodRecord } from "@/lib/api/period-service";
+import { scanSemesterQr } from "@/lib/api/qr-scan-service";
 import { getUser, type User } from "@/lib/api/user-service";
 
 type ScanOption = {
@@ -315,7 +315,7 @@ export default function HomeTabScreen() {
       setIsSubmittingScan(true);
       setScannedValue(result.data);
 
-      const response = await scanStatic({
+      const response = await scanSemesterQr({
         token: result.data,
         device_id: "mobile-app",
       });
