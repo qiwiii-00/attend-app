@@ -35,7 +35,7 @@ type ScanOption = {
   icon: typeof QrCode;
   tint: string;
   surface: string;
-  action: "scan" | "attendance" | "upcoming-class" | "coming-soon";
+  action: "scan" | "attendance" | "upcoming-class" | "feedback" | "coming-soon";
 };
 
 type WeeklyBar = {
@@ -78,7 +78,7 @@ const scanOptions: ScanOption[] = [
     icon: Star,
     tint: "#111111",
     surface: "#9AB4F0",
-    action: "coming-soon",
+    action: "feedback",
   },
 ];
 
@@ -286,6 +286,11 @@ export default function HomeTabScreen() {
 
     if (option.action === "upcoming-class") {
       router.push("/upcoming-class");
+      return;
+    }
+
+    if (option.action === "feedback") {
+      router.push("/feedback");
       return;
     }
 

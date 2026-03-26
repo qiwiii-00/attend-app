@@ -2,6 +2,20 @@ import { apiClient } from "@/lib/api/apiClient";
 import type { Course } from "@/lib/api/course-service";
 import type { Semester } from "@/lib/api/semester-service";
 
+export type PeriodSubjectRecord = {
+  id: number;
+  name: string;
+  code: string | null;
+  description: string | null;
+  course_id: number | null;
+  semester_id: number | null;
+  day_of_week: string | null;
+  period_id: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export const PERIOD_API_ROUTES = {
   periods: "/periods",
   periodsByContext: "/periods/by-context",
@@ -20,6 +34,8 @@ export type PeriodRecord = {
   updated_at: string;
   course?: Course | null;
   semester?: Semester | null;
+  subject?: PeriodSubjectRecord | null;
+  subjects?: PeriodSubjectRecord[];
 };
 
 export type PeriodContextData = {

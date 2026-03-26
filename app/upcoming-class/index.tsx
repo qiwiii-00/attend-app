@@ -17,8 +17,8 @@ import { useSession } from "@/lib/auth-context";
 import {
   getPeriodsByContext,
   type PeriodRecord,
+  type PeriodSubjectRecord,
 } from "@/lib/api/period-service";
-import { getSubjects, type SubjectRecord } from "@/lib/api/subject-service";
 
 type DayOption = {
   key: string;
@@ -35,6 +35,16 @@ type ScheduleItem = {
   subjectCode: string | null;
   state: "done" | "upcoming" | "inactive";
 };
+
+const WEEKDAY_KEYS = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const;
 
 function getWeekDays(baseDate = new Date()) {
   const current = new Date(baseDate);
@@ -79,14 +89,6 @@ function sortPeriods(periods: PeriodRecord[]) {
   );
 }
 
-function getSubjectMap(subjects: SubjectRecord[]) {
-  return new Map(
-    subjects
-      .filter((subject) => subject.period_id)
-      .map((subject) => [subject.period_id as number, subject]),
-  );
-}
-
 function isBeforeToday(date: Date) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -105,7 +107,21 @@ function toMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
-function getScheduleState(period: PeriodRecord, subject: SubjectRecord | undefined, date: Date) {
+function getWeekdayKey(date: Date) {
+  return WEEKDAY_KEYS[date.getDay()];
+}
+
+function getSubjectForDate(period: PeriodRecord, date: Date) {
+  const subjects = period.subjects ?? [];
+  const weekday = getWeekdayKey(date);
+
+  return subjects.find((subject) => subject.day_of_week === weekday)
+    ?? subjects.find((subject) => subject.day_of_week === null)
+    ?? period.subject
+    ?? undefined;
+}
+
+function getScheduleState(period: PeriodRecord, subject: PeriodSubjectRecord | undefined, date: Date) {
   if (!subject || !subject.is_active || !period.is_active) {
     return "inactive" as const;
   }
@@ -123,25 +139,25 @@ function getScheduleState(period: PeriodRecord, subject: SubjectRecord | undefin
   return nowMinutes >= toMinutes(period.end_time) ? "done" : "upcoming";
 }
 
-function buildSchedule(
-  periods: PeriodRecord[],
-  subjects: SubjectRecord[],
-  selectedDate: Date,
-) {
-  const subjectMap = getSubjectMap(subjects);
+function buildSchedule(periods: PeriodRecord[], selectedDate: Date) {
+  return sortPeriods(periods)
+    .map((period) => {
+      const subject = getSubjectForDate(period, selectedDate);
 
-  return sortPeriods(periods).map((period) => {
-    const subject = subjectMap.get(period.id);
+      if (!subject || !subject.is_active || !period.is_active) {
+        return null;
+      }
 
-    return {
-      id: period.id,
-      start_time: period.start_time,
-      end_time: period.end_time,
-      subjectName: subject?.name ?? period.name,
-      subjectCode: subject?.code ?? null,
-      state: getScheduleState(period, subject, selectedDate),
-    } satisfies ScheduleItem;
-  });
+      return {
+        id: period.id,
+        start_time: period.start_time,
+        end_time: period.end_time,
+        subjectName: subject.name ?? period.name,
+        subjectCode: subject.code ?? null,
+        state: getScheduleState(period, subject, selectedDate),
+      } satisfies ScheduleItem;
+    })
+    .filter((item): item is ScheduleItem => item !== null);
 }
 
 function getItemColors(state: ScheduleItem["state"]) {
@@ -180,36 +196,22 @@ export default function UpcomingClassScreen() {
   const [selectedDayKey, setSelectedDayKey] = useState(weekDays[0]?.key ?? "");
   const [loading, setLoading] = useState(true);
   const [periods, setPeriods] = useState<PeriodRecord[]>([]);
-  const [subjects, setSubjects] = useState<SubjectRecord[]>([]);
 
   useEffect(() => {
     async function loadSchedule() {
-      if (!user?.id || !user.course_id || !user.semester_id) {
+      setLoading(true);
+
+      if (!user?.id) {
         setPeriods([]);
-        setSubjects([]);
         setLoading(false);
         return;
       }
 
       try {
-        const [periodResponse, subjectResponse] = await Promise.all([
-          getPeriodsByContext({
-            user_id: user.id,
-            course_id: user.course_id,
-            semester_id: user.semester_id,
-          }),
-          getSubjects(),
-        ]);
-
+        const periodResponse = await getPeriodsByContext({ user_id: user.id });
         setPeriods(periodResponse.data.periods);
-        setSubjects(
-          subjectResponse.data.filter(
-            (subject) =>
-              subject.course_id === user.course_id &&
-              subject.semester_id === user.semester_id,
-          ),
-        );
       } catch (error) {
+        setPeriods([]);
         const message =
           error instanceof ApiError ? error.message : "Unable to load class schedule.";
         Alert.alert("Load failed", message);
@@ -231,8 +233,8 @@ export default function UpcomingClassScreen() {
       return [];
     }
 
-    return buildSchedule(periods, subjects, selectedDay.date);
-  }, [periods, selectedDay, subjects]);
+    return buildSchedule(periods, selectedDay.date);
+  }, [periods, selectedDay]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -319,7 +321,7 @@ export default function UpcomingClassScreen() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No classes scheduled</Text>
             <Text style={styles.emptyText}>
-              No active periods were found for your course and semester.
+              No active classes were found for the selected day in your weekly timetable.
             </Text>
           </View>
         )}
