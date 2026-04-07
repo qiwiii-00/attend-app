@@ -13,7 +13,14 @@ import {
 } from "expo-camera";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { WeeklyReportCard } from "@/components/weekly-report-card";
@@ -31,10 +38,12 @@ import { getUser, type User } from "@/lib/api/user-service";
 
 type ScanOption = {
   title: string;
+  subtitle: string;
   shortLabel: string;
   icon: typeof QrCode;
   tint: string;
   surface: string;
+  iconSurface: string;
   action: "scan" | "attendance" | "upcoming-class" | "feedback" | "coming-soon";
 };
 
@@ -49,42 +58,52 @@ type WeeklyBar = {
 
 const scanOptions: ScanOption[] = [
   {
-    title: "scan here",
+    title: "Scan here",
+    subtitle: "Scan QR code to  attendance",
     shortLabel: "Scan QR",
     icon: QrCode,
-    tint: "#111111",
-    surface: "#DCE2FF",
+    tint: "#334E7D",
+    surface: "#FFFFFF",
+    iconSurface: "#DCE8FA",
     action: "scan",
   },
   {
     title: "My Attendance",
+    subtitle: "View my attendance records",
     shortLabel: "My attendance",
     icon: GraduationCap,
-    tint: "#111111",
-    surface: "#6E8FD6",
+    tint: "#000000",
+    surface: "#FFFFFF",
+    iconSurface: "#DCE8FA",
     action: "attendance",
   },
   {
-    title: "Upcoming class",
+    title: "Class Schedule",
+    subtitle: "View classes for this week",
     shortLabel: "Schedule",
     icon: Clock3,
     tint: "#111111",
     surface: "#FFFFFF",
+    iconSurface: "#DCE8FA",
     action: "upcoming-class",
   },
   {
     title: "Feedback",
+    subtitle: "Attendance feedback and support",
     shortLabel: "Feedback",
     icon: Star,
-    tint: "#111111",
-    surface: "#9AB4F0",
+    tint: "#000000",
+    surface: "#FFFFFF",
+    iconSurface: "#DCE8FA",
     action: "feedback",
   },
 ];
 
 type Theme = (typeof AppTheme)["light"];
 
-function normalizeUserResponse(value: User | { data?: User } | null | undefined) {
+function normalizeUserResponse(
+  value: User | { data?: User } | null | undefined,
+) {
   if (!value) {
     return null;
   }
@@ -131,7 +150,10 @@ function sortPeriods(periods: PeriodRecord[]) {
   );
 }
 
-function buildWeeklyBars(attendances: AttendanceRecord[], periods: PeriodRecord[]) {
+function buildWeeklyBars(
+  attendances: AttendanceRecord[],
+  periods: PeriodRecord[],
+) {
   const labels = ["M", "T", "W", "T", "F"];
   const today = new Date();
   const startOfWeek = getStartOfWeek(today);
@@ -160,7 +182,8 @@ function buildWeeklyBars(attendances: AttendanceRecord[], periods: PeriodRecord[
     );
 
     const attended = dayAttendances.filter(
-      (attendance) => attendance.status === "present" || attendance.status === "late",
+      (attendance) =>
+        attendance.status === "present" || attendance.status === "late",
     ).length;
 
     return {
@@ -196,7 +219,9 @@ export default function HomeTabScreen() {
   const [hasScanned, setHasScanned] = useState(false);
   const [scannedValue, setScannedValue] = useState<string | null>(null);
   const [isSubmittingScan, setIsSubmittingScan] = useState(false);
-  const [scanResultMessage, setScanResultMessage] = useState<string | null>(null);
+  const [scanResultMessage, setScanResultMessage] = useState<string | null>(
+    null,
+  );
   const styles = useMemo(() => getStyles(theme), [theme]);
 
   useEffect(() => {
@@ -209,11 +234,12 @@ export default function HomeTabScreen() {
       }
 
       try {
-        const [userResponse, attendanceResponse, periodResponse] = await Promise.all([
-          getUser(sessionUser.id),
-          getAttendances(),
-          getPeriods(),
-        ]);
+        const [userResponse, attendanceResponse, periodResponse] =
+          await Promise.all([
+            getUser(sessionUser.id),
+            getAttendances(),
+            getPeriods(),
+          ]);
 
         const currentUser = normalizeUserResponse(userResponse);
         setUser(currentUser);
@@ -324,7 +350,9 @@ export default function HomeTabScreen() {
       await refreshAttendances();
     } catch (error) {
       const message =
-        error instanceof ApiError ? error.message : "Unable to mark attendance.";
+        error instanceof ApiError
+          ? error.message
+          : "Unable to mark attendance.";
 
       setScanResultMessage(message);
     } finally {
@@ -447,9 +475,12 @@ export default function HomeTabScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerBlock}>
-          <Text style={styles.helloTitle}>Hello, {getShortName(user?.name ?? sessionUser?.name)}</Text>
+          <Text style={styles.helloTitle}>
+            Hello, {getShortName(user?.name ?? sessionUser?.name)}
+          </Text>
           <Text style={styles.courseMeta}>
-            {user?.course?.title ?? "No course assigned"} {user?.semester?.title ?? ""}
+            {user?.course?.title ?? "No course assigned"}{" "}
+            {user?.semester?.title ?? ""}
           </Text>
         </View>
 
@@ -466,17 +497,21 @@ export default function HomeTabScreen() {
             return (
               <Pressable
                 key={option.title}
-                style={[
-                  styles.actionItem,
-                  { backgroundColor: option.surface },
-                  option.title === "Upcoming class" && styles.lightActionItem,
-                ]}
+                style={[styles.actionItem, { backgroundColor: option.surface }]}
                 onPress={() => handleCardPress(option)}
               >
-                <View style={styles.actionIconWrap}>
-                  <Icon size={42} color={option.tint} strokeWidth={2.2} />
+                <View
+                  style={[
+                    styles.actionIconWrap,
+                    { backgroundColor: option.iconSurface },
+                  ]}
+                >
+                  <Icon size={24} color={option.tint} strokeWidth={2.2} />
                 </View>
-                <Text style={styles.actionTitle}>{option.title}</Text>
+                <View style={styles.actionTextBlock}>
+                  <Text style={styles.actionTitle}>{option.title}</Text>
+                  <Text style={styles.actionSubtitle}>{option.subtitle}</Text>
+                </View>
               </Pressable>
             );
           })}
@@ -519,42 +554,47 @@ function getStyles(theme: Theme) {
     actionsGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      rowGap: 10,
-      columnGap: 10,
+      rowGap: 14,
+      columnGap: 12,
       marginTop: 18,
       justifyContent: "center",
     },
     actionItem: {
       width: "48%",
-      height: 130,
-      borderRadius: 20,
-      paddingHorizontal: 10,
-      paddingVertical: 18,
-      alignItems: "center",
+      minHeight: 158,
+      borderRadius: 28,
+      paddingHorizontal: 14,
+      paddingVertical: 16,
+      alignItems: "flex-start",
       justifyContent: "space-between",
       shadowColor: "#000000",
       shadowOpacity: 0.12,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 5 },
-      elevation: 3,
-    },
-    lightActionItem: {
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
       borderWidth: 1,
-      borderColor: "#E5E5E5",
+      borderColor: "#E9E9E9",
     },
     actionIconWrap: {
-      width: 58,
-      height: 58,
+      width: 46,
+      height: 46,
+      borderRadius: 23,
       alignItems: "center",
       justifyContent: "center",
-      position: "relative",
+    },
+    actionTextBlock: {
+      gap: 4,
     },
     actionTitle: {
-      fontSize: 14,
-      lineHeight: 20,
+      fontSize: 16,
+      lineHeight: 24,
       fontWeight: "700",
       color: "#111111",
-      textAlign: "center",
+    },
+    actionSubtitle: {
+      fontSize: 12,
+      lineHeight: 20,
+      color: "#2F2F2F",
     },
     scannerSafeArea: {
       flex: 1,

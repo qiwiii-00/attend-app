@@ -208,13 +208,13 @@ export default function ProfileTabScreen() {
 
   const settingsItems: ActionItem[] = [
     {
-      icon: "camera-outline",
-      label: uploadingAvatar ? "Uploading photo..." : "Change photo",
+      icon: "create-outline",
+      label: "Edit Profile",
       tint: "#1F4C9A",
       backgroundColor: "#EEF4FF",
-      disabled: uploadingAvatar,
-      onPress: handlePickAvatar,
+      onPress: () => router.push("/profile-edit"),
     },
+    
     {
       icon: "log-out-outline",
       label: loggingOut ? "Signing out..." : "Sign Out",
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   heroRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
   },
   avatarWrap: {
     position: "relative",
@@ -431,23 +431,27 @@ const styles = StyleSheet.create({
   },
   nameBlock: {
     marginTop: 18,
+    alignItems: "center",
   },
   primaryName: {
     fontSize: 33,
     lineHeight: 36,
     fontWeight: "800",
     color: "#0F172A",
+    textAlign: "center",
   },
   secondaryName: {
     fontSize: 33,
     lineHeight: 36,
     fontWeight: "300",
     color: "#9CA3AF",
+    textAlign: "center",
   },
   email: {
     marginTop: 10,
     fontSize: 14,
     color: "#6B7280",
+    textAlign: "center",
   },
   section: {
     marginTop: 34,

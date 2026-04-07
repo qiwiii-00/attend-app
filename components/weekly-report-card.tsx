@@ -13,17 +13,21 @@ type WeeklyReportCardProps = {
   maxValue?: number;
 };
 
+const CHART_GROWTH_HEIGHT = 160;
+const GRID_TOP_PADDING = 10;
+const GRID_BOTTOM_PADDING = 24;
+
 function getChartHeight(value: number, maxValue: number) {
-  if (maxValue <= 0) {
-    return 36;
+  if (maxValue <= 0 || value <= 0) {
+    return 0;
   }
 
-  const normalized = value / maxValue;
-  return 28 + normalized * 160;
+  const normalized = Math.min(value, maxValue) / maxValue;
+  return normalized * CHART_GROWTH_HEIGHT;
 }
 
 function getScaleLabels(maxValue: number) {
-  return Array.from({ length: maxValue }, (_, index) => maxValue - index);
+  return Array.from({ length: maxValue + 1 }, (_, index) => maxValue - index);
 }
 
 export function WeeklyReportCard({
@@ -31,11 +35,16 @@ export function WeeklyReportCard({
   summaryText,
   maxValue,
 }: WeeklyReportCardProps) {
-  const maxWeeklyValue = Math.max(maxValue ?? Math.max(...bars.map((bar) => bar.value), 1), 1);
+  const maxWeeklyValue = Math.max(
+    maxValue ?? Math.max(...bars.map((bar) => bar.value), 1),
+    1,
+  );
   const scaleLabels = getScaleLabels(maxWeeklyValue);
-  const activeBar = bars.find((bar) => bar.isToday) ?? bars.reduce((maxBar, bar) => {
-    return bar.value > maxBar.value ? bar : maxBar;
-  }, bars[0]);
+  const activeBar =
+    bars.find((bar) => bar.isToday) ??
+    bars.reduce((maxBar, bar) => {
+      return bar.value > maxBar.value ? bar : maxBar;
+    }, bars[0]);
 
   return (
     <View style={styles.card}>
@@ -58,7 +67,9 @@ export function WeeklyReportCard({
         <View style={styles.chartArea}>
           <View style={styles.gridOverlay} pointerEvents="none">
             {scaleLabels.map((label) => (
-              <View key={`grid-${label}`} style={styles.gridLine} />
+              <View key={`grid-${label}`} style={styles.gridRow}>
+                <View style={styles.gridLine} />
+              </View>
             ))}
           </View>
 
@@ -91,7 +102,9 @@ export function WeeklyReportCard({
                       isActive ? styles.barActive : styles.barMuted,
                     ]}
                   />
-                  <Text style={[styles.barLabel, isActive && styles.barLabelActive]}>
+                  <Text
+                    style={[styles.barLabel, isActive && styles.barLabelActive]}
+                  >
                     {bar.label}
                   </Text>
                 </View>
@@ -152,13 +165,12 @@ const styles = StyleSheet.create({
   },
   scaleColumn: {
     width: 26,
-    justifyContent: "space-between",
-    paddingTop: 36,
-    paddingBottom: 22,
+    paddingTop: GRID_TOP_PADDING,
+    paddingBottom: GRID_BOTTOM_PADDING,
   },
   scaleRow: {
     flex: 1,
-    justifyContent: "flex-start",
+    justifyContent: "center",
   },
   scaleText: {
     fontSize: 11,
@@ -178,9 +190,12 @@ const styles = StyleSheet.create({
   },
   gridOverlay: {
     ...StyleSheet.absoluteFillObject,
-    paddingTop: 46,
-    paddingBottom: 28,
-    justifyContent: "space-between",
+    paddingTop: GRID_TOP_PADDING,
+    paddingBottom: GRID_BOTTOM_PADDING,
+  },
+  gridRow: {
+    flex: 1,
+    justifyContent: "center",
   },
   gridLine: {
     borderTopWidth: 1,

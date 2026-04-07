@@ -1,4 +1,10 @@
-import { ArrowLeft, CalendarDays, Check, Clock3, XCircle } from "lucide-react-native";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Check,
+  Clock3,
+  XCircle,
+} from "lucide-react-native";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -15,6 +21,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError } from "@/lib/api/apiClient";
 import {
   getAttendances,
+  getUserAttendanceSummary,
+  type AttendanceSummaryItem,
   type AttendanceRecord,
 } from "@/lib/api/attendance-service";
 import {
@@ -38,6 +46,14 @@ type GroupedAttendance = {
     timeLabel: string;
     status: AttendanceRecord["status"];
   }[];
+};
+
+type SummaryRange = "Day" | "Month";
+type AttendanceSummaryTotals = {
+  total: number;
+  present: number;
+  late: number;
+  absent: number;
 };
 
 function getAttendanceDate(attendance: AttendanceRecord) {
@@ -69,7 +85,9 @@ function getSubjectName(
   sessionMap: Map<number, AttendanceSessionRecord>,
 ) {
   const session = sessionMap.get(attendance.attendance_session_id);
-  return session?.subject?.title ?? `Session #${attendance.attendance_session_id}`;
+  return (
+    session?.subject?.title ?? `Session #${attendance.attendance_session_id}`
+  );
 }
 
 function buildSubjectSummary(
@@ -90,7 +108,9 @@ function buildSubjectSummary(
     subjectTotals.set(name, existing);
   }
 
-  return Array.from(subjectTotals.values()).sort((left, right) => right.total - left.total);
+  return Array.from(subjectTotals.values()).sort(
+    (left, right) => right.total - left.total,
+  );
 }
 
 function buildGroupedHistory(
@@ -126,7 +146,9 @@ function buildGroupedHistory(
     .sort((left, right) => right.dateKey.localeCompare(left.dateKey))
     .map((group) => ({
       ...group,
-      items: group.items.sort((left, right) => left.timeLabel.localeCompare(right.timeLabel)),
+      items: group.items.sort((left, right) =>
+        left.timeLabel.localeCompare(right.timeLabel),
+      ),
     }));
 }
 
@@ -145,34 +167,48 @@ function getWeeklyWindow() {
   return { start, end };
 }
 
-function getWeeklySummary(attendances: AttendanceRecord[]) {
-  const { start, end } = getWeeklyWindow();
+function formatApiDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
-  return attendances.reduce(
-    (summary, attendance) => {
-      const date = getAttendanceDate(attendance);
-      if (!date || date < start || date > end) {
-        return summary;
-      }
+function getSelectedRangeMeta(range: SummaryRange) {
+  const today = new Date();
 
-      summary.total += 1;
+  if (range === "Day") {
+    const todayValue = formatApiDate(today);
 
-      if (attendance.status === "present") {
-        summary.present += 1;
-      }
+    return {
+      sortBy: "daily" as const,
+      title: "Today",
+      fromDate: todayValue,
+      toDate: todayValue,
+      matchItem: (item: AttendanceSummaryItem) => item.date === todayValue,
+    };
+  }
 
-      if (attendance.status === "late") {
-        summary.late += 1;
-      }
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-      if (attendance.status === "absent") {
-        summary.absent += 1;
-      }
+  return {
+    sortBy: "monthly" as const,
+    title: "This month",
+    fromDate: formatApiDate(startOfMonth),
+    toDate: formatApiDate(endOfMonth),
+    matchItem: (item: AttendanceSummaryItem) =>
+      item.year === today.getFullYear() && item.month === today.getMonth() + 1,
+  };
+}
 
-      return summary;
-    },
-    { total: 0, present: 0, late: 0, absent: 0 },
-  );
+function getSummaryTotals(item?: AttendanceSummaryItem | null): AttendanceSummaryTotals {
+  return {
+    total: item?.total_count ?? 0,
+    present: item?.present_count ?? 0,
+    late: item?.late_count ?? 0,
+    absent: item?.absent_count ?? 0,
+  };
 }
 
 function getStatusColors(status: AttendanceRecord["status"]) {
@@ -190,8 +226,16 @@ function getStatusColors(status: AttendanceRecord["status"]) {
 export default function AttendanceScreen() {
   const { user } = useSession();
   const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(true);
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
   const [sessions, setSessions] = useState<AttendanceSessionRecord[]>([]);
+  const [selectedRange, setSelectedRange] = useState<SummaryRange>("Day");
+  const [summaryTotals, setSummaryTotals] = useState<AttendanceSummaryTotals>({
+    total: 0,
+    present: 0,
+    late: 0,
+    absent: 0,
+  });
 
   useEffect(() => {
     async function loadAttendanceData() {
@@ -211,7 +255,9 @@ export default function AttendanceScreen() {
         setAttendances(
           attendanceResponse.data
             .filter((attendance) => attendance.user_id === user.id)
-            .sort((left, right) => right.created_at.localeCompare(left.created_at)),
+            .sort((left, right) =>
+              right.created_at.localeCompare(left.created_at),
+            ),
         );
         setSessions(sessionResponse.data);
       } catch (error) {
@@ -226,8 +272,46 @@ export default function AttendanceScreen() {
     loadAttendanceData();
   }, [user]);
 
+  useEffect(() => {
+    async function loadSummary() {
+      if (!user?.id) {
+        setSummaryTotals({ total: 0, present: 0, late: 0, absent: 0 });
+        setSummaryLoading(false);
+        return;
+      }
+
+      const rangeMeta = getSelectedRangeMeta(selectedRange);
+
+      try {
+        setSummaryLoading(true);
+
+        const response = await getUserAttendanceSummary({
+          sort_by: rangeMeta.sortBy,
+          user_id: user.id,
+          semester_id: user.semester_id ?? undefined,
+          from_date: rangeMeta.fromDate,
+          to_date: rangeMeta.toDate,
+        });
+
+        const matchedItem =
+          response.data.items.find(rangeMeta.matchItem) ?? response.data.items[0] ?? null;
+
+        setSummaryTotals(getSummaryTotals(matchedItem));
+      } catch (error) {
+        setSummaryTotals({ total: 0, present: 0, late: 0, absent: 0 });
+
+        if (!(error instanceof ApiError)) {
+          Alert.alert("Load failed", "Unable to load attendance summary.");
+        }
+      } finally {
+        setSummaryLoading(false);
+      }
+    }
+
+    loadSummary();
+  }, [selectedRange, user]);
+
   const sessionMap = useMemo(() => getSessionMap(sessions), [sessions]);
-  const weeklySummary = useMemo(() => getWeeklySummary(attendances), [attendances]);
   const subjectSummary = useMemo(
     () => buildSubjectSummary(attendances, sessionMap),
     [attendances, sessionMap],
@@ -235,6 +319,10 @@ export default function AttendanceScreen() {
   const groupedHistory = useMemo(
     () => buildGroupedHistory(attendances, sessionMap),
     [attendances, sessionMap],
+  );
+  const selectedRangeMeta = useMemo(
+    () => getSelectedRangeMeta(selectedRange),
+    [selectedRange],
   );
 
   return (
@@ -250,40 +338,78 @@ export default function AttendanceScreen() {
           </Pressable>
           <View style={styles.headerText}>
             <Text style={styles.title}>My Attendance</Text>
-            <Text style={styles.subtitle}>Weekly summary and subject-wise history</Text>
+            <Text style={styles.subtitle}>
+              Weekly summary and subject-wise history
+            </Text>
           </View>
         </View>
 
         {loading ? (
           <View style={styles.loadingState}>
             <ActivityIndicator size="large" color="#39508A" />
-            <Text style={styles.loadingText}>Loading attendance details...</Text>
+            <Text style={styles.loadingText}>
+              Loading attendance details...
+            </Text>
           </View>
         ) : (
           <>
+            <View style={styles.filterTabs}>
+              {(["Day", "Month"] as const).map((option) => {
+                const isActive = option === selectedRange;
+
+                return (
+                  <Pressable
+                    key={option}
+                    style={[
+                      styles.filterTab,
+                      isActive && styles.filterTabActive,
+                    ]}
+                    onPress={() => setSelectedRange(option)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterTabText,
+                        isActive && styles.filterTabTextActive,
+                      ]}
+                    >
+                      {option}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             <View style={styles.summaryCard}>
               <View style={styles.summaryHeader}>
-                <Text style={styles.summaryTitle}>This week</Text>
+                <Text style={styles.summaryTitle}>{selectedRangeMeta.title}</Text>
                 <View style={styles.summaryChip}>
                   <CalendarDays size={14} color="#39508A" strokeWidth={2.2} />
-                  <Text style={styles.summaryChipText}>{weeklySummary.total} classes</Text>
+                  <Text style={styles.summaryChipText}>
+                    {summaryTotals.total} classes
+                  </Text>
                 </View>
               </View>
 
               <View style={styles.summaryStats}>
                 <View style={[styles.statTile, { backgroundColor: "#EAF8EE" }]}>
                   <Check size={18} color="#207A3C" strokeWidth={2.5} />
-                  <Text style={styles.statValue}>{weeklySummary.present}</Text>
+                  <Text style={styles.statValue}>
+                    {summaryLoading ? "..." : summaryTotals.present}
+                  </Text>
                   <Text style={styles.statLabel}>Present</Text>
                 </View>
                 <View style={[styles.statTile, { backgroundColor: "#FFF3DB" }]}>
                   <Clock3 size={18} color="#A66200" strokeWidth={2.5} />
-                  <Text style={styles.statValue}>{weeklySummary.late}</Text>
+                  <Text style={styles.statValue}>
+                    {summaryLoading ? "..." : summaryTotals.late}
+                  </Text>
                   <Text style={styles.statLabel}>Late</Text>
                 </View>
                 <View style={[styles.statTile, { backgroundColor: "#FFE7E7" }]}>
                   <XCircle size={18} color="#B33535" strokeWidth={2.5} />
-                  <Text style={styles.statValue}>{weeklySummary.absent}</Text>
+                  <Text style={styles.statValue}>
+                    {summaryLoading ? "..." : summaryTotals.absent}
+                  </Text>
                   <Text style={styles.statLabel}>Absent</Text>
                 </View>
               </View>
@@ -293,15 +419,18 @@ export default function AttendanceScreen() {
               <Text style={styles.sectionTitle}>By subject</Text>
               {subjectSummary.length > 0 ? (
                 subjectSummary.map((subject) => {
-                  const percentage = subject.total > 0
-                    ? Math.round((subject.attended / subject.total) * 100)
-                    : 0;
+                  const percentage =
+                    subject.total > 0
+                      ? Math.round((subject.attended / subject.total) * 100)
+                      : 0;
 
                   return (
                     <View key={subject.name} style={styles.subjectCard}>
                       <View style={styles.subjectTopRow}>
                         <Text style={styles.subjectName}>{subject.name}</Text>
-                        <Text style={styles.subjectMeta}>{subject.attended}/{subject.total}</Text>
+                        <Text style={styles.subjectMeta}>
+                          {subject.attended}/{subject.total}
+                        </Text>
                       </View>
                       <View style={styles.progressTrack}>
                         <View
@@ -311,42 +440,64 @@ export default function AttendanceScreen() {
                           ]}
                         />
                       </View>
-                      <Text style={styles.subjectPercent}>{percentage}% attendance</Text>
+                      <Text style={styles.subjectPercent}>
+                        {percentage}% attendance
+                      </Text>
                     </View>
                   );
                 })
               ) : (
                 <View style={styles.emptyCard}>
-                  <Text style={styles.emptyTitle}>No attendance records yet</Text>
-                  <Text style={styles.emptyCopy}>Scan a class QR to start building your report.</Text>
+                  <Text style={styles.emptyTitle}>
+                    No attendance records yet
+                  </Text>
+                  <Text style={styles.emptyCopy}>
+                    Scan a class QR to start building your report.
+                  </Text>
                 </View>
               )}
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Recent history</Text>
-              {groupedHistory.length > 0 ? (
-                groupedHistory.map((group) => (
-                  <View key={group.dateKey} style={styles.historyGroup}>
-                    <Text style={styles.groupLabel}>{group.dateLabel}</Text>
-                    {group.items.map((item) => {
-                      const status = getStatusColors(item.status);
+              {groupedHistory.length > 0
+                ? groupedHistory.map((group) => (
+                    <View key={group.dateKey} style={styles.historyGroup}>
+                      <Text style={styles.groupLabel}>{group.dateLabel}</Text>
+                      {group.items.map((item) => {
+                        const status = getStatusColors(item.status);
 
-                      return (
-                        <View key={item.id} style={styles.historyRow}>
-                          <View style={styles.historyText}>
-                            <Text style={styles.historySubject}>{item.subjectName}</Text>
-                            <Text style={styles.historyTime}>{item.timeLabel}</Text>
+                        return (
+                          <View key={item.id} style={styles.historyRow}>
+                            <View style={styles.historyText}>
+                              <Text style={styles.historySubject}>
+                                {item.subjectName}
+                              </Text>
+                              <Text style={styles.historyTime}>
+                                {item.timeLabel}
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.statusPill,
+                                { backgroundColor: status.bg },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.statusText,
+                                  { color: status.fg },
+                                ]}
+                              >
+                                {status.label}
+                              </Text>
+                            </View>
                           </View>
-                          <View style={[styles.statusPill, { backgroundColor: status.bg }]}> 
-                            <Text style={[styles.statusText, { color: status.fg }]}>{status.label}</Text>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                ))
-              ) : null}
+                        );
+                      })}
+                    </View>
+                  ))
+                : null}
             </View>
           </>
         )}
@@ -406,6 +557,34 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     color: "#667085",
+  },
+  filterTabs: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#DCE7F1",
+    borderRadius: 999,
+    padding: 6,
+    gap: 6,
+  },
+  filterTab: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  filterTabActive: {
+    backgroundColor: "#171717",
+  },
+  filterTabText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#171717",
+  },
+  filterTabTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "700",
   },
   summaryCard: {
     backgroundColor: "#F3F6FF",

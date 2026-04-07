@@ -67,7 +67,9 @@ export default function ProfileEditScreen() {
   const [selectedRole, setSelectedRole] =
     useState<(typeof roleOptions)[number]>("Student");
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
-  const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(null);
+  const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(
+    null,
+  );
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [showSemesterModal, setShowSemesterModal] = useState(false);
@@ -79,11 +81,12 @@ export default function ProfileEditScreen() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [currentUser, courseResponse, semesterResponse] = await Promise.all([
-          sessionUser ? Promise.resolve(sessionUser) : refreshSession(),
-          getCourses(),
-          getSemesters(),
-        ]);
+        const [currentUser, courseResponse, semesterResponse] =
+          await Promise.all([
+            sessionUser ? Promise.resolve(sessionUser) : refreshSession(),
+            getCourses(),
+            getSemesters(),
+          ]);
 
         if (!currentUser) {
           setUser(null);
@@ -128,7 +131,9 @@ export default function ProfileEditScreen() {
     );
   }, [selectedCourseId, semesters]);
 
-  const selectedCourse = courses.find((course) => course.id === selectedCourseId);
+  const selectedCourse = courses.find(
+    (course) => course.id === selectedCourseId,
+  );
   const selectedSemester = semesters.find(
     (semester) => semester.id === selectedSemesterId,
   );
@@ -139,7 +144,8 @@ export default function ProfileEditScreen() {
     }
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
         Alert.alert(
@@ -257,7 +263,10 @@ export default function ProfileEditScreen() {
           <Text style={styles.emptyText}>
             Sign in again to continue editing your profile.
           </Text>
-          <Pressable style={styles.secondaryButton} onPress={() => router.replace("/")}>
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() => router.replace("/")}
+          >
             <Text style={styles.secondaryButtonText}>Back to Login</Text>
           </Pressable>
         </View>
@@ -267,20 +276,24 @@ export default function ProfileEditScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.hero}>
+        <Pressable style={styles.backRow} onPress={() => router.back()}>
+          <Ionicons
+            name="chevron-back"
+            size={18}
+            color={theme.colors.heading}
+          />
+        </Pressable>
+        <View style={styles.titleWrap}>
+          <Text style={styles.title}>Edit your profile</Text>
+        </View>
+      </View>
+
       <ScrollView
         style={styles.screen}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
-          <Pressable style={styles.backRow} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={18} color={theme.colors.heading} />
-            <Text style={styles.backText}>Back</Text>
-          </Pressable>
-          <Text style={styles.eyebrow}>Profile</Text>
-          <Text style={styles.title}>Edit your profile</Text>
-        </View>
-
         <View style={styles.card}>
           <View style={styles.avatarSection}>
             <Pressable
@@ -296,12 +309,17 @@ export default function ProfileEditScreen() {
                     contentFit="cover"
                   />
                 ) : (
-                  <Text style={styles.avatarInitials}>{getInitials(name || user.name)}</Text>
+                  <Text style={styles.avatarInitials}>
+                    {getInitials(name || user.name)}
+                  </Text>
                 )}
 
                 {uploadingAvatar ? (
                   <View style={styles.avatarLoadingOverlay}>
-                    <ActivityIndicator size="small" color={theme.colors.accentContrast} />
+                    <ActivityIndicator
+                      size="small"
+                      color={theme.colors.accentContrast}
+                    />
                   </View>
                 ) : null}
               </View>
@@ -316,14 +334,16 @@ export default function ProfileEditScreen() {
 
             <Text style={styles.avatarTitle}>Update your profile photo</Text>
             <Text style={styles.avatarHint}>
-              {uploadingAvatar ? "Uploading image..." : "Tap the avatar to choose an image."}
+              {uploadingAvatar
+                ? "Uploading image..."
+                : "Tap the avatar to choose an image."}
             </Text>
           </View>
 
           <View style={styles.fieldBlock}>
             <Text style={styles.label}>Email</Text>
             <View style={styles.readonlyField}>
-              <Ionicons name="mail-outline" size={18} color={theme.colors.accentStrong} />
+              <Ionicons name="mail-outline" size={18} />
               <Text style={styles.readonlyValue}>{user.email}</Text>
             </View>
           </View>
@@ -331,7 +351,11 @@ export default function ProfileEditScreen() {
           <View style={styles.fieldBlock}>
             <Text style={styles.label}>Name</Text>
             <View style={styles.inputShell}>
-              <Ionicons name="person-outline" size={18} color={theme.colors.accentStrong} />
+              <Ionicons
+                name="person-outline"
+                size={18}
+                color={theme.colors.accentStrong}
+              />
               <TextInput
                 value={name}
                 onChangeText={setName}
@@ -345,7 +369,11 @@ export default function ProfileEditScreen() {
           <View style={styles.fieldBlock}>
             <Text style={styles.label}>Student ID</Text>
             <View style={styles.inputShell}>
-              <Ionicons name="card-outline" size={18} color={theme.colors.accentStrong} />
+              <Ionicons
+                name="card-outline"
+                size={18}
+                color={theme.colors.accentStrong}
+              />
               <TextInput
                 value={studentId}
                 onChangeText={setStudentId}
@@ -357,38 +385,12 @@ export default function ProfileEditScreen() {
           </View>
 
           <View style={styles.fieldBlock}>
-            <Text style={styles.label}>Role</Text>
-            <Pressable style={styles.selector} onPress={() => setShowRoleModal(true)}>
-              <View style={styles.selectorLeft}>
-                <Ionicons name="people-outline" size={18} color={theme.colors.accentStrong} />
-                <Text style={styles.selectorText}>{selectedRole}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.mutedText} />
-            </Pressable>
-          </View>
-
-          <View style={styles.fieldBlock}>
-            <Text style={styles.label}>Course</Text>
-            <Pressable style={styles.selector} onPress={() => setShowCourseModal(true)}>
-              <View style={styles.selectorLeft}>
-                <Ionicons name="library-outline" size={18} color={theme.colors.accentStrong} />
-                <Text
-                  style={[
-                    styles.selectorText,
-                    !selectedCourse && styles.selectorPlaceholder,
-                  ]}
-                >
-                  {selectedCourse?.title ?? "Choose a course"}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.mutedText} />
-            </Pressable>
-          </View>
-
-          <View style={styles.fieldBlock}>
             <Text style={styles.label}>Semester</Text>
             <Pressable
-              style={[styles.selector, !selectedCourseId && styles.selectorDisabled]}
+              style={[
+                styles.selector,
+                !selectedCourseId && styles.selectorDisabled,
+              ]}
               onPress={() => {
                 if (!selectedCourseId) {
                   Alert.alert(
@@ -402,7 +404,11 @@ export default function ProfileEditScreen() {
               }}
             >
               <View style={styles.selectorLeft}>
-                <Ionicons name="albums-outline" size={18} color={theme.colors.accentStrong} />
+                <Ionicons
+                  name="albums-outline"
+                  size={18}
+                  color={theme.colors.accentStrong}
+                />
                 <Text
                   style={[
                     styles.selectorText,
@@ -412,16 +418,25 @@ export default function ProfileEditScreen() {
                   {selectedSemester?.title ?? "Choose a semester"}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.mutedText} />
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={theme.colors.mutedText}
+              />
             </Pressable>
           </View>
 
           <Pressable
-            style={[styles.primaryButton, saving && styles.primaryButtonDisabled]}
+            style={[
+              styles.primaryButton,
+              saving && styles.primaryButtonDisabled,
+            ]}
             onPress={handleSave}
             disabled={saving}
           >
-            <Text style={styles.primaryButtonText}>{saving ? "Saving..." : "Save Changes"}</Text>
+            <Text style={styles.primaryButtonText}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -431,7 +446,9 @@ export default function ProfileEditScreen() {
         title="Select Role"
         options={roleOptions.map((role) => ({ value: role, label: role }))}
         selectedValue={selectedRole}
-        onSelect={(value) => setSelectedRole(value as (typeof roleOptions)[number])}
+        onSelect={(value) =>
+          setSelectedRole(value as (typeof roleOptions)[number])
+        }
         onClose={() => setShowRoleModal(false)}
       />
 
@@ -480,27 +497,35 @@ function createStyles(theme: Theme) {
     },
     content: {
       paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.lg,
+      paddingTop: 0,
       paddingBottom: theme.spacing.xl,
     },
     hero: {
       borderRadius: theme.radius.xl,
-      paddingHorizontal: 22,
-      paddingVertical: 24,
-      minHeight: 120,
-      justifyContent: "flex-end",
+      paddingHorizontal: 32,
+      marginBottom: 12,
+      minHeight: 72,
+      justifyContent: "center",
+      position: "relative",
+      backgroundColor: theme.colors.background,
     },
     backRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 4,
-      marginBottom: 12,
-      alignSelf: "flex-start",
+      justifyContent: "center",
+      width: 36,
+      height: 36,
+      position: "absolute",
+      left: 10,
+      top: "50%",
+      marginTop: -18,
+      zIndex: 1,
     },
-    backText: {
-      fontSize: 14,
-      fontWeight: "700",
-      color: theme.colors.heading,
+    titleWrap: {
+      width: "100%",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 44,
     },
     eyebrow: {
       ...theme.typography.eyebrow,
@@ -508,17 +533,16 @@ function createStyles(theme: Theme) {
       opacity: 0.84,
     },
     title: {
-      marginTop: 8,
       ...theme.typography.title,
+      fontSize: 24,
+      lineHeight: 30,
       color: theme.colors.text,
+      textAlign: "center",
     },
     card: {
       marginTop: -10,
-      backgroundColor: theme.colors.card,
-      borderRadius: theme.radius.xl,
-      padding: 20,
+      padding: 12,
       gap: 16,
-      ...theme.shadow.card,
     },
     avatarSection: {
       alignItems: "center",
@@ -601,8 +625,10 @@ function createStyles(theme: Theme) {
     readonlyField: {
       height: 56,
       borderRadius: theme.radius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
       paddingHorizontal: 16,
-      backgroundColor: theme.colors.accentSoft,
+      backgroundColor: theme.colors.surfaceElevated,
       flexDirection: "row",
       alignItems: "center",
       gap: 12,

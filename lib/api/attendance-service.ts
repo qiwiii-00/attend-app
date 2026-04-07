@@ -3,10 +3,12 @@ import { apiClient } from "@/lib/api/apiClient";
 export const ATTENDANCE_API_ROUTES = {
   attendances: "/attendances",
   attendanceById: (id: number | string) => `/attendances/${id}`,
+  userSummary: "/attendance/user-summary",
   scanStatic: "/attendance/scan-static",
 } as const;
 
 export type AttendanceStatus = "present" | "absent" | "late";
+export type AttendanceSummarySortBy = "daily" | "weekly" | "monthly" | "semester";
 
 export type AttendanceSessionSummary = {
   id: number;
@@ -44,6 +46,33 @@ export type AttendanceApiResponse<TData> = {
   errors?: Record<string, string[]> | null;
 };
 
+export type AttendanceSummaryItem = {
+  total_count: number;
+  present_count: number;
+  absent_count: number;
+  late_count: number;
+  present_percentage: number;
+  date?: string;
+  year?: number;
+  week?: number;
+  month?: number;
+  semester_id?: number;
+  semester_title?: string | null;
+};
+
+export type AttendanceSummaryFilters = {
+  semester_id: number | null;
+  from_date: string | null;
+  to_date: string | null;
+};
+
+export type AttendanceSummaryResponse = {
+  sort_by: AttendanceSummarySortBy;
+  user_id: number;
+  filters: AttendanceSummaryFilters;
+  items: AttendanceSummaryItem[];
+};
+
 export type SaveAttendancePayload = {
   user_id: number;
   attendance_session_id: number;
@@ -58,6 +87,14 @@ export type UpdateAttendancePayload = Partial<SaveAttendancePayload>;
 export type ScanStaticAttendancePayload = {
   token: string;
   device_id?: string | null;
+};
+
+export type GetUserAttendanceSummaryParams = {
+  sort_by: AttendanceSummarySortBy;
+  user_id?: number;
+  semester_id?: number;
+  from_date?: string;
+  to_date?: string;
 };
 
 const sessionRequestOptions = {
@@ -76,6 +113,16 @@ export const attendanceService = {
     return apiClient.get<AttendanceApiResponse<AttendanceRecord>>(
       ATTENDANCE_API_ROUTES.attendanceById(id),
       sessionRequestOptions,
+    );
+  },
+
+  getUserAttendanceSummary(params: GetUserAttendanceSummaryParams) {
+    return apiClient.get<AttendanceApiResponse<AttendanceSummaryResponse>>(
+      ATTENDANCE_API_ROUTES.userSummary,
+      {
+        ...sessionRequestOptions,
+        query: params,
+      },
     );
   },
 
@@ -114,6 +161,7 @@ export const attendanceService = {
 export const {
   getAttendances,
   getAttendance,
+  getUserAttendanceSummary,
   createAttendance,
   updateAttendance,
   deleteAttendance,
