@@ -42,9 +42,6 @@ type ScanOption = {
   subtitle: string;
   shortLabel: string;
   icon: typeof QrCode;
-  tint: string;
-  surface: string;
-  iconSurface: string;
   action: "scan" | "attendance" | "upcoming-class" | "feedback" | "coming-soon";
 };
 
@@ -63,9 +60,6 @@ const scanOptions: ScanOption[] = [
     subtitle: "Scan QR code to  attendance",
     shortLabel: "Scan QR",
     icon: QrCode,
-    tint: "#334E7D",
-    surface: "#FFFFFF",
-    iconSurface: "#DCE8FA",
     action: "scan",
   },
   {
@@ -73,9 +67,6 @@ const scanOptions: ScanOption[] = [
     subtitle: "View my attendance records",
     shortLabel: "My attendance",
     icon: GraduationCap,
-    tint: "#000000",
-    surface: "#FFFFFF",
-    iconSurface: "#DCE8FA",
     action: "attendance",
   },
   {
@@ -83,9 +74,6 @@ const scanOptions: ScanOption[] = [
     subtitle: "View classes for this week",
     shortLabel: "Schedule",
     icon: Clock3,
-    tint: "#111111",
-    surface: "#FFFFFF",
-    iconSurface: "#DCE8FA",
     action: "upcoming-class",
   },
   {
@@ -93,9 +81,6 @@ const scanOptions: ScanOption[] = [
     subtitle: "Attendance feedback and support",
     shortLabel: "Feedback",
     icon: Star,
-    tint: "#000000",
-    surface: "#FFFFFF",
-    iconSurface: "#DCE8FA",
     action: "feedback",
   },
 ];
@@ -207,6 +192,30 @@ function getWeeklySummary(bars: WeeklyBar[]) {
     },
     { attended: 0, total: 0 },
   );
+}
+
+function getScanOptionPalette(theme: Theme, action: ScanOption["action"]) {
+  if (action === "scan") {
+    return {
+      surface: theme.colors.card,
+      iconSurface: theme.colors.infoSoft,
+      tint: theme.colors.info,
+    };
+  }
+
+  if (action === "feedback") {
+    return {
+      surface: theme.colors.card,
+      iconSurface: theme.colors.cardAccent,
+      tint: theme.colors.accent,
+    };
+  }
+
+  return {
+    surface: theme.colors.card,
+    iconSurface: theme.colors.surfaceMuted,
+    tint: theme.colors.heading,
+  };
 }
 
 export default function HomeTabScreen() {
@@ -507,20 +516,21 @@ export default function HomeTabScreen() {
         <View style={styles.actionsGrid}>
           {scanOptions.map((option) => {
             const Icon = option.icon;
+            const palette = getScanOptionPalette(theme, option.action);
 
             return (
               <Pressable
                 key={option.title}
-                style={[styles.actionItem, { backgroundColor: option.surface }]}
+                style={[styles.actionItem, { backgroundColor: palette.surface }]}
                 onPress={() => handleCardPress(option)}
               >
                 <View
                   style={[
                     styles.actionIconWrap,
-                    { backgroundColor: option.iconSurface },
+                    { backgroundColor: palette.iconSurface },
                   ]}
                 >
-                  <Icon size={24} color={option.tint} strokeWidth={2.2} />
+                  <Icon size={24} color={palette.tint} strokeWidth={2.2} />
                 </View>
                 <View style={styles.actionTextBlock}>
                   <Text style={styles.actionTitle}>{option.title}</Text>
@@ -536,14 +546,16 @@ export default function HomeTabScreen() {
 }
 
 function getStyles(theme: Theme) {
+  const isDark = theme.colors.background === AppTheme.dark.colors.background;
+
   return StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: "#FFFFFF",
+      backgroundColor: theme.colors.background,
     },
     screen: {
       flex: 1,
-      backgroundColor: "#FFFFFF",
+      backgroundColor: theme.colors.background,
     },
     content: {
       paddingHorizontal: 22,
@@ -558,12 +570,12 @@ function getStyles(theme: Theme) {
       fontSize: 28,
       lineHeight: 34,
       fontWeight: "800",
-      color: "#111111",
+      color: theme.colors.heading,
     },
     courseMeta: {
       fontSize: 15,
       lineHeight: 21,
-      color: "#3B3B3B",
+      color: theme.colors.mutedText,
     },
     actionsGrid: {
       flexDirection: "row",
@@ -582,12 +594,12 @@ function getStyles(theme: Theme) {
       alignItems: "flex-start",
       justifyContent: "space-between",
       shadowColor: "#000000",
-      shadowOpacity: 0.12,
+      shadowOpacity: isDark ? 0.24 : 0.12,
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 4 },
       elevation: 4,
       borderWidth: 1,
-      borderColor: "#E9E9E9",
+      borderColor: theme.colors.border,
     },
     actionIconWrap: {
       width: 46,
@@ -603,12 +615,12 @@ function getStyles(theme: Theme) {
       fontSize: 16,
       lineHeight: 24,
       fontWeight: "700",
-      color: "#111111",
+      color: theme.colors.heading,
     },
     actionSubtitle: {
       fontSize: 12,
       lineHeight: 20,
-      color: "#2F2F2F",
+      color: theme.colors.mutedText,
     },
     scannerSafeArea: {
       flex: 1,
@@ -622,7 +634,7 @@ function getStyles(theme: Theme) {
       flex: 1,
       justifyContent: "space-between",
       backgroundColor:
-        theme.colors.background === AppTheme.dark.colors.background
+        isDark
           ? "rgba(2, 6, 23, 0.42)"
           : "rgba(4, 10, 28, 0.28)",
       paddingHorizontal: theme.spacing.lg,
@@ -644,12 +656,12 @@ function getStyles(theme: Theme) {
       height: 42,
       borderRadius: 21,
       backgroundColor:
-        theme.colors.background === AppTheme.dark.colors.background
+        isDark
           ? "rgba(15, 23, 42, 0.82)"
           : "rgba(15, 23, 42, 0.6)",
       borderWidth: 1,
       borderColor:
-        theme.colors.background === AppTheme.dark.colors.background
+        isDark
           ? "rgba(148,163,184,0.3)"
           : "rgba(255,255,255,0.18)",
       alignItems: "center",
@@ -661,12 +673,12 @@ function getStyles(theme: Theme) {
       height: 252,
       borderRadius: 28,
       backgroundColor:
-        theme.colors.background === AppTheme.dark.colors.background
+        isDark
           ? "rgba(15, 23, 42, 0.22)"
           : "rgba(255,255,255,0.05)",
       borderWidth: 1,
       borderColor:
-        theme.colors.background === AppTheme.dark.colors.background
+        isDark
           ? "rgba(148,163,184,0.22)"
           : "rgba(255,255,255,0.12)",
     },
@@ -710,12 +722,12 @@ function getStyles(theme: Theme) {
     tipCard: {
       borderRadius: theme.radius.lg,
       backgroundColor:
-        theme.colors.background === AppTheme.dark.colors.background
+        isDark
           ? "rgba(15, 23, 42, 0.9)"
           : "rgba(15, 23, 42, 0.7)",
       borderWidth: 1,
       borderColor:
-        theme.colors.background === AppTheme.dark.colors.background
+        isDark
           ? "rgba(148,163,184,0.18)"
           : "rgba(255,255,255,0.1)",
       padding: 18,
@@ -727,13 +739,15 @@ function getStyles(theme: Theme) {
       fontWeight: "800",
     },
     tipCopy: {
-      color: "#CBD5E1",
+      color: isDark ? "#CBD5E1" : "#E2E8F0",
       fontSize: 14,
       lineHeight: 20,
     },
     resultCard: {
       borderRadius: theme.radius.lg,
       backgroundColor: theme.colors.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
       padding: 18,
       gap: 12,
     },

@@ -670,7 +670,10 @@ export default function FeedbackScreen() {
                         ]}
                       >
                         <Text
-                          style={[styles.statusText, { color: status.textColor }]}
+                          style={[
+                            styles.statusText,
+                            { color: status.textColor },
+                          ]}
                         >
                           {status.label}
                         </Text>
@@ -761,7 +764,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 40,
+    paddingBottom: 280,
   },
   headerRow: {
     flexDirection: "row",

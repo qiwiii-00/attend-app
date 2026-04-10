@@ -29,6 +29,7 @@ import {
   getAttendanceSessions,
   type AttendanceSessionRecord,
 } from "@/lib/api/attendance-session-service";
+import { MonthlySubjectAttendanceCard } from "@/components/monthly-subject-attendance-card";
 import { useSession } from "@/lib/auth-context";
 
 type SubjectSummary = {
@@ -113,6 +114,14 @@ function buildSubjectSummary(
   );
 }
 
+function isInCurrentMonth(date: Date) {
+  const today = new Date();
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth()
+  );
+}
+
 function buildGroupedHistory(
   attendances: AttendanceRecord[],
   sessionMap: Map<number, AttendanceSessionRecord>,
@@ -125,7 +134,7 @@ function buildGroupedHistory(
       continue;
     }
 
-    const dateKey = date.toISOString().slice(0, 10);
+    const dateKey = formatApiDate(date);
     const existing = groups.get(dateKey) ?? {
       dateKey,
       dateLabel: formatDayLabel(date),
@@ -150,21 +159,6 @@ function buildGroupedHistory(
         left.timeLabel.localeCompare(right.timeLabel),
       ),
     }));
-}
-
-function getWeeklyWindow() {
-  const today = new Date();
-  const currentDay = today.getDay();
-  const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
-  const start = new Date(today);
-  start.setDate(today.getDate() + mondayOffset);
-  start.setHours(0, 0, 0, 0);
-
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
-
-  return { start, end };
 }
 
 function formatApiDate(date: Date) {
@@ -202,7 +196,9 @@ function getSelectedRangeMeta(range: SummaryRange) {
   };
 }
 
-function getSummaryTotals(item?: AttendanceSummaryItem | null): AttendanceSummaryTotals {
+function getSummaryTotals(
+  item?: AttendanceSummaryItem | null,
+): AttendanceSummaryTotals {
   return {
     total: item?.total_count ?? 0,
     present: item?.present_count ?? 0,
@@ -294,7 +290,9 @@ export default function AttendanceScreen() {
         });
 
         const matchedItem =
-          response.data.items.find(rangeMeta.matchItem) ?? response.data.items[0] ?? null;
+          response.data.items.find(rangeMeta.matchItem) ??
+          response.data.items[0] ??
+          null;
 
         setSummaryTotals(getSummaryTotals(matchedItem));
       } catch (error) {
@@ -312,10 +310,14 @@ export default function AttendanceScreen() {
   }, [selectedRange, user]);
 
   const sessionMap = useMemo(() => getSessionMap(sessions), [sessions]);
-  const subjectSummary = useMemo(
-    () => buildSubjectSummary(attendances, sessionMap),
-    [attendances, sessionMap],
-  );
+  const subjectSummary = useMemo(() => {
+    const monthlyAttendances = attendances.filter((attendance) => {
+      const date = getAttendanceDate(attendance);
+      return date ? isInCurrentMonth(date) : false;
+    });
+
+    return buildSubjectSummary(monthlyAttendances, sessionMap);
+  }, [attendances, sessionMap]);
   const groupedHistory = useMemo(
     () => buildGroupedHistory(attendances, sessionMap),
     [attendances, sessionMap],
@@ -381,7 +383,9 @@ export default function AttendanceScreen() {
 
             <View style={styles.summaryCard}>
               <View style={styles.summaryHeader}>
-                <Text style={styles.summaryTitle}>{selectedRangeMeta.title}</Text>
+                <Text style={styles.summaryTitle}>
+                  {selectedRangeMeta.title}
+                </Text>
                 <View style={styles.summaryChip}>
                   <CalendarDays size={14} color="#39508A" strokeWidth={2.2} />
                   <Text style={styles.summaryChipText}>
@@ -403,7 +407,7 @@ export default function AttendanceScreen() {
                   <Text style={styles.statValue}>
                     {summaryLoading ? "..." : summaryTotals.late}
                   </Text>
-                  <Text style={styles.statLabel}>Late</Text>
+                  <Text style={styles.statLabel}>Leave Granted</Text>
                 </View>
                 <View style={[styles.statTile, { backgroundColor: "#FFE7E7" }]}>
                   <XCircle size={18} color="#B33535" strokeWidth={2.5} />
@@ -416,88 +420,29 @@ export default function AttendanceScreen() {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>By subject</Text>
+              <Text style={styles.sectionTitle}>Monthly by subject</Text>
               {subjectSummary.length > 0 ? (
                 subjectSummary.map((subject) => {
-                  const percentage =
-                    subject.total > 0
-                      ? Math.round((subject.attended / subject.total) * 100)
-                      : 0;
-
                   return (
-                    <View key={subject.name} style={styles.subjectCard}>
-                      <View style={styles.subjectTopRow}>
-                        <Text style={styles.subjectName}>{subject.name}</Text>
-                        <Text style={styles.subjectMeta}>
-                          {subject.attended}/{subject.total}
-                        </Text>
-                      </View>
-                      <View style={styles.progressTrack}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            { width: `${percentage}%` },
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.subjectPercent}>
-                        {percentage}% attendance
-                      </Text>
-                    </View>
+                    <MonthlySubjectAttendanceCard
+                      key={subject.name}
+                      subjectName={subject.name}
+                      attended={subject.attended}
+                      total={subject.total}
+                    />
                   );
                 })
               ) : (
                 <View style={styles.emptyCard}>
                   <Text style={styles.emptyTitle}>
-                    No attendance records yet
+                    No monthly attendance records yet
                   </Text>
                   <Text style={styles.emptyCopy}>
-                    Scan a class QR to start building your report.
+                    Subject-wise attendance cards will appear here as you attend
+                    classes this month.
                   </Text>
                 </View>
               )}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Recent history</Text>
-              {groupedHistory.length > 0
-                ? groupedHistory.map((group) => (
-                    <View key={group.dateKey} style={styles.historyGroup}>
-                      <Text style={styles.groupLabel}>{group.dateLabel}</Text>
-                      {group.items.map((item) => {
-                        const status = getStatusColors(item.status);
-
-                        return (
-                          <View key={item.id} style={styles.historyRow}>
-                            <View style={styles.historyText}>
-                              <Text style={styles.historySubject}>
-                                {item.subjectName}
-                              </Text>
-                              <Text style={styles.historyTime}>
-                                {item.timeLabel}
-                              </Text>
-                            </View>
-                            <View
-                              style={[
-                                styles.statusPill,
-                                { backgroundColor: status.bg },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.statusText,
-                                  { color: status.fg },
-                                ]}
-                              >
-                                {status.label}
-                              </Text>
-                            </View>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  ))
-                : null}
             </View>
           </>
         )}
@@ -587,7 +532,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   summaryCard: {
-    backgroundColor: "#F3F6FF",
+    backgroundColor: "#658caf",
     borderRadius: 24,
     padding: 18,
     gap: 16,
@@ -624,9 +569,11 @@ const styles = StyleSheet.create({
   },
   statTile: {
     flex: 1,
+    flexDirection: "column",
     borderRadius: 18,
     paddingVertical: 16,
     paddingHorizontal: 12,
+    justifyContent: "center",
     alignItems: "center",
     gap: 6,
   },
@@ -634,10 +581,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
     color: "#111111",
+    textAlign: "center",
   },
   statLabel: {
     fontSize: 13,
     color: "#4B5563",
+    textAlign: "center",
   },
   section: {
     gap: 12,
@@ -646,46 +595,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#111111",
-  },
-  subjectCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#E9EDF5",
-    gap: 10,
-  },
-  subjectTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  subjectName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111111",
-  },
-  subjectMeta: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#5C6780",
-  },
-  progressTrack: {
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: "#E5EBFA",
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor: "#6E8FD6",
-  },
-  subjectPercent: {
-    fontSize: 12,
-    color: "#5C6780",
   },
   emptyCard: {
     borderRadius: 18,

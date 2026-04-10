@@ -136,14 +136,14 @@ export default function ProfileTabScreen() {
   const displayName = user?.name ?? sessionUser?.name;
   const { primary, secondary } = splitName(displayName);
 
-
   async function handlePickAvatar() {
     if (uploadingAvatar) {
       return;
     }
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
         Alert.alert(
@@ -214,7 +214,7 @@ export default function ProfileTabScreen() {
       backgroundColor: "#EEF4FF",
       onPress: () => router.push("/profile-edit"),
     },
-    
+
     {
       icon: "log-out-outline",
       label: loggingOut ? "Signing out..." : "Sign Out",
@@ -233,11 +233,7 @@ export default function ProfileTabScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.container}>
-          <View style={styles.topBar}>
-            
-
-    
-          </View>
+          <View style={styles.topBar}></View>
 
           {loading ? (
             <View style={styles.loadingBlock}>
@@ -275,8 +271,6 @@ export default function ProfileTabScreen() {
                     <Ionicons name="camera-outline" size={12} color="#FFFFFF" />
                   </View>
                 </Pressable>
-
-                
               </View>
 
               <View style={styles.nameBlock}>
@@ -319,7 +313,10 @@ export default function ProfileTabScreen() {
                   return (
                     <Pressable
                       key={item.label}
-                      style={[styles.itemRow, item.disabled && styles.buttonDisabled]}
+                      style={[
+                        styles.itemRow,
+                        item.disabled && styles.buttonDisabled,
+                      ]}
                       onPress={item.onPress}
                       disabled={item.disabled}
                     >
@@ -329,7 +326,11 @@ export default function ProfileTabScreen() {
                           { backgroundColor: item.backgroundColor },
                         ]}
                       >
-                        <Ionicons name={item.icon} size={18} color={item.tint} />
+                        <Ionicons
+                          name={item.icon}
+                          size={18}
+                          color={item.tint}
+                        />
                       </View>
                       <Text style={styles.settingsLabel}>{item.label}</Text>
                       <View style={styles.chevronWrap}>
@@ -393,9 +394,9 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",

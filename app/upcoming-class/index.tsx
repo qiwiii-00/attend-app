@@ -46,6 +46,13 @@ const WEEKDAY_KEYS = [
   "saturday",
 ] as const;
 
+function getLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function getWeekDays(baseDate = new Date()) {
   const current = new Date(baseDate);
   const currentDay = current.getDay();
@@ -59,7 +66,7 @@ function getWeekDays(baseDate = new Date()) {
     date.setDate(start.getDate() + index);
 
     return {
-      key: date.toISOString().slice(0, 10),
+      key: getLocalDateKey(date),
       date,
       weekdayShort: new Intl.DateTimeFormat("en-US", {
         weekday: "short",
@@ -118,9 +125,11 @@ function getSubjectForDate(
 ) {
   const weekday = getWeekdayKey(date);
 
-  return subjects.find((subject) => subject.day_of_week === weekday)
-    ?? subjects.find((subject) => subject.day_of_week === null)
-    ?? undefined;
+  return (
+    subjects.find((subject) => subject.day_of_week === weekday) ??
+    subjects.find((subject) => subject.day_of_week === null) ??
+    undefined
+  );
 }
 
 function getScheduleState(
@@ -210,10 +219,27 @@ function getItemColors(state: ScheduleItem["state"]) {
 export default function UpcomingClassScreen() {
   const { user } = useSession();
   const weekDays = useMemo(() => getWeekDays(), []);
-  const [selectedDayKey, setSelectedDayKey] = useState(weekDays[0]?.key ?? "");
+
+  const currentDayKey = useMemo(() => {
+    const today = new Date();
+    const todayKey = getLocalDateKey(today);
+    return (
+      weekDays.find((day) => day.key === todayKey)?.key ??
+      weekDays[0]?.key ??
+      ""
+    );
+  }, [weekDays]);
+
+  const [selectedDayKey, setSelectedDayKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [periods, setPeriods] = useState<PeriodRecord[]>([]);
   const [subjects, setSubjects] = useState<SubjectRecord[]>([]);
+
+  useEffect(() => {
+    if (currentDayKey) {
+      setSelectedDayKey(currentDayKey);
+    }
+  }, [currentDayKey]);
 
   useEffect(() => {
     async function loadSchedule() {
@@ -244,7 +270,9 @@ export default function UpcomingClassScreen() {
         setPeriods([]);
         setSubjects([]);
         const message =
-          error instanceof ApiError ? error.message : "Unable to load class schedule.";
+          error instanceof ApiError
+            ? error.message
+            : "Unable to load class schedule.";
         Alert.alert("Load failed", message);
       } finally {
         setLoading(false);
@@ -281,7 +309,9 @@ export default function UpcomingClassScreen() {
           <Text style={styles.title}>Upcoming Class</Text>
         </View>
 
-        <Text style={styles.monthTitle}>{formatMonth(selectedDay?.date ?? new Date())}</Text>
+        <Text style={styles.monthTitle}>
+          {formatMonth(selectedDay?.date ?? new Date())}
+        </Text>
 
         <View style={styles.dayStrip}>
           {weekDays.map((day) => {
@@ -293,10 +323,20 @@ export default function UpcomingClassScreen() {
                 style={[styles.dayChip, active && styles.dayChipActive]}
                 onPress={() => setSelectedDayKey(day.key)}
               >
-                <Text style={[styles.dayChipWeek, active && styles.dayChipWeekActive]}>
+                <Text
+                  style={[
+                    styles.dayChipWeek,
+                    active && styles.dayChipWeekActive,
+                  ]}
+                >
                   {day.weekdayShort}
                 </Text>
-                <Text style={[styles.dayChipDate, active && styles.dayChipDateActive]}>
+                <Text
+                  style={[
+                    styles.dayChipDate,
+                    active && styles.dayChipDateActive,
+                  ]}
+                >
                   {day.dayNumber}
                 </Text>
               </Pressable>
@@ -306,9 +346,13 @@ export default function UpcomingClassScreen() {
 
         <View style={styles.dayHeader}>
           <Text style={styles.dayName}>
-            {new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(selectedDay?.date ?? new Date())}
+            {new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(
+              selectedDay?.date ?? new Date(),
+            )}
           </Text>
-          <Text style={styles.dayDate}>{formatLongDate(selectedDay?.date ?? new Date())}</Text>
+          <Text style={styles.dayDate}>
+            {formatLongDate(selectedDay?.date ?? new Date())}
+          </Text>
         </View>
 
         {loading ? (
@@ -324,13 +368,23 @@ export default function UpcomingClassScreen() {
               return (
                 <View key={item.id} style={styles.timelineRow}>
                   <View style={styles.timelineRail}>
-                    <View style={[styles.timelineDot, { backgroundColor: colors.iconBg }]}>
+                    <View
+                      style={[
+                        styles.timelineDot,
+                        { backgroundColor: colors.iconBg },
+                      ]}
+                    >
                       {item.state === "done" || item.state === "upcoming" ? (
                         <Check size={12} color="#FFFFFF" strokeWidth={3} />
                       ) : null}
                     </View>
                     {index < scheduleItems.length - 1 ? (
-                      <View style={[styles.timelineLine, { backgroundColor: colors.line }]} />
+                      <View
+                        style={[
+                          styles.timelineLine,
+                          { backgroundColor: colors.line },
+                        ]}
+                      />
                     ) : null}
                   </View>
 
@@ -338,8 +392,16 @@ export default function UpcomingClassScreen() {
                     <Text style={[styles.timeText, { color: colors.muted }]}>
                       {item.start_time} - {item.end_time}
                     </Text>
-                    <View style={[styles.classCard, { backgroundColor: colors.cardBg }]}>
-                      <Text style={[styles.classTitle, { color: colors.text }]} numberOfLines={1}>
+                    <View
+                      style={[
+                        styles.classCard,
+                        { backgroundColor: colors.cardBg },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.classTitle, { color: colors.text }]}
+                        numberOfLines={1}
+                      >
                         {item.subjectName}
                       </Text>
                     </View>
@@ -352,7 +414,8 @@ export default function UpcomingClassScreen() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No classes scheduled</Text>
             <Text style={styles.emptyText}>
-              No active classes were found for the selected day in your weekly timetable.
+              No active classes were found for the selected day in your weekly
+              timetable.
             </Text>
           </View>
         )}
