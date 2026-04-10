@@ -11,6 +11,7 @@ import {
   type BarcodeScanningResult,
   useCameraPermissions,
 } from "expo-camera";
+import * as Location from "expo-location";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -341,9 +342,22 @@ export default function HomeTabScreen() {
       setIsSubmittingScan(true);
       setScannedValue(result.data);
 
+      const locationPermission =
+        await Location.requestForegroundPermissionsAsync();
+
+      if (locationPermission.status !== "granted") {
+        throw new Error("Location permission is required to scan attendance QR.");
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
       const response = await scanSemesterQr({
         token: result.data,
         device_id: "mobile-app",
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
       });
 
       setScanResultMessage(response.message);

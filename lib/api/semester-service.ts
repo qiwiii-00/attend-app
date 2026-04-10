@@ -13,6 +13,9 @@ export type Semester = {
   title: string;
   description: string | null;
   semester_number: number;
+  geofence_latitude: number | null;
+  geofence_longitude: number | null;
+  geofence_radius_meters: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -24,6 +27,9 @@ export type SaveSemesterPayload = {
   title: string;
   description?: string | null;
   semester_number: number;
+  geofence_latitude: number;
+  geofence_longitude: number;
+  geofence_radius_meters: number;
   is_active?: boolean;
 };
 
@@ -33,6 +39,9 @@ export type SemesterQrData = {
   semester_id: number;
   title: string;
   token: string;
+  geofence_latitude: number | null;
+  geofence_longitude: number | null;
+  geofence_radius_meters: number | null;
   qr_image_url: string;
 };
 

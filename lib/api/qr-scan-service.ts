@@ -10,6 +10,8 @@ export const QR_SCAN_API_ROUTES = {
 export type ScanSemesterQrPayload = {
   token: string;
   device_id?: string | null;
+  latitude: number;
+  longitude: number;
 };
 
 const sessionRequestOptions = {

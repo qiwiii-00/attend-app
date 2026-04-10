@@ -40,7 +40,7 @@ export class ApiError extends Error {
   }
 }
 
-const DEFAULT_BASE_URL = "http://192.168.1.54:8000/api";
+const DEFAULT_BASE_URL = "http://192.168.1.41:8000/api";
 
 let authToken: string | null = null;
 
