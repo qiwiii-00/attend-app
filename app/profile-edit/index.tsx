@@ -25,7 +25,9 @@ import { getSemesters, type Semester } from "@/lib/api/semester-service";
 import {
   createStaffDetail,
   getStaffDetails,
+  type SaveStaffDetailPayload,
   type StaffDetailRecord,
+  type UpdateStaffDetailPayload,
   updateStaffDetail,
 } from "@/lib/api/staff-detail-service";
 import { useSession } from "@/lib/auth-context";
@@ -33,6 +35,13 @@ import { updateUser, type User } from "@/lib/api/user-service";
 
 const roleOptions = ["Student", "Teacher", "Admin", "Receptionist"] as const;
 const staffRoleOptions = roleOptions.filter((role) => role !== "Student");
+const staffPositionOptions = [
+  "Faculty",
+  "Course Coordinator",
+  "Academic Head",
+  "Receptionist",
+  "Academic Admin",
+] as const;
 type Theme = (typeof AppTheme)["light"];
 
 function normalizeListResponse<T>(value: unknown): T[] {
@@ -70,6 +79,36 @@ function getRoleFlags(role: (typeof roleOptions)[number]) {
   };
 }
 
+function buildStaffDetailPayload(
+  role: (typeof roleOptions)[number],
+  values: {
+    position: string;
+    phone1: string;
+    phone2: string;
+    notes: string;
+  },
+) {
+  return {
+    position: values.position.trim() || null,
+    phone_1: values.phone1.trim() || null,
+    phone_2: values.phone2.trim() || null,
+    notes: values.notes.trim() || null,
+    is_admin: false,
+    is_teacher: false,
+    is_receptionist: false,
+    ...getRoleFlags(role),
+  };
+}
+
+async function findExistingStaffDetail(userId: number) {
+  const response = await getStaffDetails();
+  return (
+    normalizeListResponse<StaffDetailRecord>(response).find(
+      (staffDetail) => staffDetail.user_id === userId,
+    ) ?? null
+  );
+}
+
 export default function ProfileEditScreen() {
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -91,6 +130,7 @@ export default function ProfileEditScreen() {
   const [staffPhone2, setStaffPhone2] = useState("");
   const [staffNotes, setStaffNotes] = useState("");
   const [showRoleModal, setShowRoleModal] = useState(false);
+  const [showPositionModal, setShowPositionModal] = useState(false);
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [showSemesterModal, setShowSemesterModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -169,6 +209,14 @@ export default function ProfileEditScreen() {
   );
   const isStudentRole = selectedRole === "Student";
   const isStaffRole = !isStudentRole;
+
+  function handleRoleSelect(role: (typeof roleOptions)[number]) {
+    setSelectedRole(role);
+
+    if (role === "Receptionist") {
+      setStaffPosition("Receptionist");
+    }
+  }
 
   async function handlePickAvatar() {
     if (uploadingAvatar) {
@@ -265,18 +313,25 @@ export default function ProfileEditScreen() {
       syncUser(response.data);
 
       if (isStaffRole) {
-        const payload = {
-          user_id: response.data.id,
-          position: staffPosition.trim() || null,
-          phone_1: staffPhone1.trim() || null,
-          phone_2: staffPhone2.trim() || null,
-          notes: staffNotes.trim() || null,
-          ...getRoleFlags(selectedRole),
-        };
+        const staffFields = buildStaffDetailPayload(selectedRole, {
+          position: staffPosition,
+          phone1: staffPhone1,
+          phone2: staffPhone2,
+          notes: staffNotes,
+        });
 
-        const staffResponse = staffDetailId
-          ? await updateStaffDetail(staffDetailId, payload)
-          : await createStaffDetail(payload);
+        const existingStaffDetail =
+          staffDetailId ? { id: staffDetailId } : await findExistingStaffDetail(response.data.id);
+
+        const staffResponse = existingStaffDetail
+          ? await updateStaffDetail(
+              existingStaffDetail.id,
+              staffFields satisfies UpdateStaffDetailPayload,
+            )
+          : await createStaffDetail({
+              user_id: response.data.id,
+              ...staffFields,
+            } satisfies SaveStaffDetailPayload);
 
         setStaffDetailId(staffResponse.data.id);
         setStaffPosition(staffResponse.data.position ?? "");
@@ -539,20 +594,31 @@ export default function ProfileEditScreen() {
             <>
               <View style={styles.fieldBlock}>
                 <Text style={styles.label}>Position</Text>
-                <View style={styles.inputShell}>
+                <Pressable
+                  style={styles.selector}
+                  onPress={() => setShowPositionModal(true)}
+                >
+                  <View style={styles.selectorLeft}>
+                    <Ionicons
+                      name="briefcase-outline"
+                      size={18}
+                      color={theme.colors.accentStrong}
+                    />
+                    <Text
+                      style={[
+                        styles.selectorText,
+                        !staffPosition && styles.selectorPlaceholder,
+                      ]}
+                    >
+                      {staffPosition || "Choose a position"}
+                    </Text>
+                  </View>
                   <Ionicons
-                    name="briefcase-outline"
+                    name="chevron-forward"
                     size={18}
-                    color={theme.colors.accentStrong}
+                    color={theme.colors.mutedText}
                   />
-                  <TextInput
-                    value={staffPosition}
-                    onChangeText={setStaffPosition}
-                    placeholder={`Enter ${selectedRole.toLowerCase()} position`}
-                    placeholderTextColor={theme.colors.mutedText}
-                    style={styles.input}
-                  />
-                </View>
+                </Pressable>
               </View>
 
               <View style={styles.fieldBlock}>
@@ -642,10 +708,20 @@ export default function ProfileEditScreen() {
             : undefined,
         }))}
         selectedValue={selectedRole}
-        onSelect={(value) =>
-          setSelectedRole(value as (typeof roleOptions)[number])
-        }
+        onSelect={(value) => handleRoleSelect(value as (typeof roleOptions)[number])}
         onClose={() => setShowRoleModal(false)}
+      />
+
+      <SelectionSheetModal
+        visible={showPositionModal && isStaffRole}
+        title="Select Position"
+        options={staffPositionOptions.map((position) => ({
+          value: position,
+          label: position,
+        }))}
+        selectedValue={staffPosition}
+        onSelect={(value) => setStaffPosition(String(value))}
+        onClose={() => setShowPositionModal(false)}
       />
 
       <SelectionSheetModal
