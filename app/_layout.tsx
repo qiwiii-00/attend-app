@@ -30,7 +30,7 @@ function AuthGate({ children }: PropsWithChildren) {
     }
 
     const firstSegment = segments[0];
-    const onIndex = segments.length === 0;
+    const onIndex = firstSegment === "index";
     const inTabs = firstSegment === "(tabs)";
     const inProfileReg = firstSegment === "profile-reg";
 
