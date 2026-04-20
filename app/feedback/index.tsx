@@ -25,6 +25,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { SelectionSheetModal } from "@/components/selection-sheet-modal";
+import { AppTheme } from "@/constants/theme";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { ApiError } from "@/lib/api/apiClient";
 import {
   createComplaint,
@@ -63,6 +65,8 @@ type SubmittedComplaint = {
   status: ComplaintStatus;
 };
 
+type Theme = (typeof AppTheme)["light"];
+
 const complaintTypeOptions: ComplaintTypeOption[] = [
   { label: "Attendance mismatch", value: "Attendance mismatch" },
   { label: "Marked absent by mistake", value: "Marked absent by mistake" },
@@ -71,27 +75,27 @@ const complaintTypeOptions: ComplaintTypeOption[] = [
   { label: "Other attendance issue", value: "Other attendance issue" },
 ];
 
-function getStatusPresentation(status: ComplaintStatus) {
+function getStatusPresentation(theme: Theme, status: ComplaintStatus) {
   if (status === "approve") {
     return {
       label: "Approved",
-      badgeBackground: "#E7F8EC",
-      textColor: "#1C7C3C",
+      badgeBackground: theme.colors.surfaceSoft,
+      textColor: theme.colors.info,
     };
   }
 
   if (status === "reject") {
     return {
       label: "Rejected",
-      badgeBackground: "#FDEAEA",
-      textColor: "#B33535",
+      badgeBackground: theme.colors.cardAccent,
+      textColor: theme.colors.accentStrong,
     };
   }
 
   return {
     label: "Pending",
-    badgeBackground: "#FFF0B3",
-    textColor: "#6A5400",
+    badgeBackground: theme.colors.infoSoft,
+    textColor: theme.colors.accentStrong,
   };
 }
 
@@ -203,6 +207,8 @@ function parseDdMmYyyy(value: string) {
 
 export default function FeedbackScreen() {
   const { user } = useSession();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [activeTab, setActiveTab] = useState<FeedbackTab>("new");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -457,7 +463,11 @@ export default function FeedbackScreen() {
       >
         <View style={styles.headerRow}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ChevronLeft size={20} color="#111111" strokeWidth={2.5} />
+            <ChevronLeft
+              size={20}
+              color={theme.colors.heading}
+              strokeWidth={2.5}
+            />
           </Pressable>
           <Text style={styles.title}>Feedback</Text>
         </View>
@@ -500,7 +510,7 @@ export default function FeedbackScreen() {
         {activeTab === "new" ? (
           loading ? (
             <View style={styles.loadingState}>
-              <ActivityIndicator size="large" color="#30497E" />
+              <ActivityIndicator size="large" color={theme.colors.accentStrong} />
               <Text style={styles.loadingText}>Loading complaint form...</Text>
             </View>
           ) : (
@@ -517,7 +527,11 @@ export default function FeedbackScreen() {
                 >
                   {complaintType ?? "Select complaint type"}
                 </Text>
-                <ChevronDown size={18} color="#111111" strokeWidth={2.3} />
+                <ChevronDown
+                  size={18}
+                  color={theme.colors.heading}
+                  strokeWidth={2.3}
+                />
               </Pressable>
 
               <View style={styles.sectionCard}>
@@ -533,7 +547,7 @@ export default function FeedbackScreen() {
                           setDateOfClass(formatDateInput(text))
                         }
                         placeholder="dd-mm-yyyy"
-                        placeholderTextColor="#A3A8B4"
+                        placeholderTextColor={theme.colors.subtleText}
                         keyboardType="number-pad"
                         style={styles.textInput}
                         maxLength={10}
@@ -545,7 +559,7 @@ export default function FeedbackScreen() {
                       >
                         <CalendarDays
                           size={18}
-                          color="#8B90A0"
+                          color={theme.colors.mutedText}
                           strokeWidth={2.2}
                         />
                       </Pressable>
@@ -573,7 +587,7 @@ export default function FeedbackScreen() {
                       </Text>
                       <ChevronDown
                         size={18}
-                        color="#8B90A0"
+                        color={theme.colors.mutedText}
                         strokeWidth={2.2}
                       />
                     </Pressable>
@@ -597,7 +611,11 @@ export default function FeedbackScreen() {
                         ? `${selectedPeriod.start_time} - ${selectedPeriod.end_time}`
                         : "Select Time"}
                     </Text>
-                    <ChevronDown size={18} color="#8B90A0" strokeWidth={2.2} />
+                    <ChevronDown
+                      size={18}
+                      color={theme.colors.mutedText}
+                      strokeWidth={2.2}
+                    />
                   </Pressable>
                 </View>
               </View>
@@ -608,7 +626,7 @@ export default function FeedbackScreen() {
                   value={reason}
                   onChangeText={setReason}
                   placeholder="Explain clearly why this attendance is incorrect. e.g. I was present but was marked absent, I have a medical certificate..."
-                  placeholderTextColor="#A3A8B4"
+                  placeholderTextColor={theme.colors.subtleText}
                   multiline
                   textAlignVertical="top"
                   style={styles.reasonInput}
@@ -622,7 +640,11 @@ export default function FeedbackScreen() {
                     style={styles.uploadButton}
                     onPress={handlePickProof}
                   >
-                    <Upload size={16} color="#fdfdfd" strokeWidth={2.2} />
+                    <Upload
+                      size={16}
+                      color={theme.colors.accentContrast}
+                      strokeWidth={2.2}
+                    />
                     <Text style={styles.uploadButtonText}>Upload</Text>
                   </Pressable>
                   <Text
@@ -656,7 +678,7 @@ export default function FeedbackScreen() {
             {submittedComplaints.map((complaint) => (
               <View key={complaint.id} style={styles.complaintCard}>
                 {(() => {
-                  const status = getStatusPresentation(complaint.status);
+                  const status = getStatusPresentation(theme, complaint.status);
 
                   return (
                     <View style={styles.complaintHeader}>
@@ -693,7 +715,11 @@ export default function FeedbackScreen() {
 
                 {complaint.proofName ? (
                   <View style={styles.attachmentRow}>
-                    <FileText size={15} color="#5C6480" strokeWidth={2.2} />
+                    <FileText
+                      size={15}
+                      color={theme.colors.mutedText}
+                      strokeWidth={2.2}
+                    />
                     <Text style={styles.attachmentText}>
                       {complaint.proofName}
                     </Text>
@@ -752,273 +778,285 @@ export default function FeedbackScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 280,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F4F7FE",
-  },
-  title: {
-    fontSize: 29,
-    lineHeight: 35,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  tabRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 26,
-  },
-  tabButton: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#111111",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-  },
-  tabButtonActive: {
-    backgroundColor: "#050505",
-    borderColor: "#050505",
-  },
-  tabLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111111",
-  },
-  tabLabelActive: {
-    color: "#FFFFFF",
-  },
-  form: {
-    marginTop: 16,
-    gap: 12,
-  },
-  dropdownField: {
-    minHeight: 42,
-    borderWidth: 1,
-    borderColor: "#AEB6CA",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
-  },
-  dropdownText: {
-    flex: 1,
-    fontSize: 15,
-    color: "#111111",
-  },
-  placeholderText: {
-    color: "#A3A8B4",
-  },
-  sectionCard: {
-    borderRadius: 16,
-    backgroundColor: "#CCD4F1",
-    padding: 14,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#111111",
-    marginBottom: 12,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  halfField: {
-    flex: 1,
-  },
-  fullField: {
-    marginTop: 10,
-  },
-  fieldLabel: {
-    fontSize: 13,
-    color: "#30354A",
-    marginBottom: 6,
-  },
-  inputShell: {
-    minHeight: 40,
-    borderRadius: 11,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#111111",
-    paddingVertical: 0,
-  },
-  calendarIconButton: {
-    width: 24,
-    height: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  reasonInput: {
-    minHeight: 116,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 12,
-    fontSize: 14,
-    lineHeight: 19,
-    color: "#111111",
-  },
-  supportingTitle: {
-    marginTop: 12,
-    marginBottom: 10,
-  },
-  uploadRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  uploadButton: {
-    minWidth: 92,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: "#2e82ff",
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  uploadButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#e7e7e7",
-  },
-  uploadHint: {
-    flex: 1,
-    fontSize: 14,
-    color: "#4C536B",
-  },
-  submitButton: {
-    alignSelf: "center",
-    width: 234,
-    minHeight: 40,
-    borderRadius: 14,
-    backgroundColor: "#6496fb",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 4,
-  },
-  submitButtonDisabled: {
-    opacity: 0.7,
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-  loadingState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 80,
-    gap: 10,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: "#6C7487",
-  },
-  complaintList: {
-    marginTop: 18,
-    gap: 12,
-  },
-  complaintCard: {
-    borderRadius: 18,
-    backgroundColor: "#F6F8FD",
-    padding: 16,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: "#E0E6F4",
-  },
-  complaintHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  complaintType: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  complaintMeta: {
-    fontSize: 13,
-    color: "#5C6480",
-  },
-  complaintReason: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#1D2235",
-  },
-  attachmentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 2,
-  },
-  attachmentText: {
-    fontSize: 13,
-    color: "#5C6480",
-  },
-  emptyState: {
-    marginTop: 22,
-    borderRadius: 18,
-    backgroundColor: "#F7F9FC",
-    padding: 20,
-    gap: 6,
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  emptyText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#71798B",
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      paddingBottom: 280,
+    },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    title: {
+      fontSize: 29,
+      lineHeight: 35,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    tabRow: {
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 26,
+    },
+    tabButton: {
+      flex: 1,
+      minHeight: 40,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.card,
+      paddingHorizontal: 12,
+    },
+    tabButtonActive: {
+      backgroundColor: theme.colors.accentStrong,
+      borderColor: theme.colors.accentStrong,
+    },
+    tabLabel: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: theme.colors.heading,
+    },
+    tabLabelActive: {
+      color: theme.colors.accentContrast,
+    },
+    form: {
+      marginTop: 16,
+      gap: 12,
+    },
+    dropdownField: {
+      minHeight: 42,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: theme.colors.surfaceElevated,
+    },
+    dropdownText: {
+      flex: 1,
+      fontSize: 15,
+      color: theme.colors.heading,
+    },
+    placeholderText: {
+      color: theme.colors.subtleText,
+    },
+    sectionCard: {
+      borderRadius: 16,
+      backgroundColor: theme.colors.surfaceMuted,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: theme.colors.heading,
+      marginBottom: 12,
+    },
+    row: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    halfField: {
+      flex: 1,
+    },
+    fullField: {
+      marginTop: 10,
+    },
+    fieldLabel: {
+      fontSize: 13,
+      color: theme.colors.text,
+      marginBottom: 6,
+    },
+    inputShell: {
+      minHeight: 40,
+      borderRadius: 11,
+      backgroundColor: theme.colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    textInput: {
+      flex: 1,
+      fontSize: 15,
+      color: theme.colors.heading,
+      paddingVertical: 0,
+    },
+    calendarIconButton: {
+      width: 24,
+      height: 24,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    reasonInput: {
+      minHeight: 116,
+      borderRadius: 12,
+      backgroundColor: theme.colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 12,
+      paddingTop: 12,
+      paddingBottom: 12,
+      fontSize: 14,
+      lineHeight: 19,
+      color: theme.colors.heading,
+    },
+    supportingTitle: {
+      marginTop: 12,
+      marginBottom: 10,
+    },
+    uploadRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    uploadButton: {
+      minWidth: 92,
+      height: 34,
+      borderRadius: 10,
+      backgroundColor: theme.colors.accentStrong,
+      paddingHorizontal: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+    },
+    uploadButtonText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.colors.accentContrast,
+    },
+    uploadHint: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.colors.mutedText,
+    },
+    submitButton: {
+      alignSelf: "center",
+      width: 234,
+      minHeight: 40,
+      borderRadius: 14,
+      backgroundColor: theme.colors.accentStrong,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 4,
+    },
+    submitButtonDisabled: {
+      opacity: 0.7,
+    },
+    submitButtonText: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: theme.colors.accentContrast,
+    },
+    loadingState: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 80,
+      gap: 10,
+    },
+    loadingText: {
+      fontSize: 14,
+      color: theme.colors.mutedText,
+    },
+    complaintList: {
+      marginTop: 18,
+      gap: 12,
+    },
+    complaintCard: {
+      borderRadius: 18,
+      backgroundColor: theme.colors.surfaceElevated,
+      padding: 16,
+      gap: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    complaintHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    complaintType: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    statusBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: theme.radius.pill,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    complaintMeta: {
+      fontSize: 13,
+      color: theme.colors.mutedText,
+    },
+    complaintReason: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.text,
+    },
+    attachmentRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 2,
+    },
+    attachmentText: {
+      fontSize: 13,
+      color: theme.colors.mutedText,
+    },
+    emptyState: {
+      marginTop: 22,
+      borderRadius: 18,
+      backgroundColor: theme.colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 20,
+      gap: 6,
+    },
+    emptyTitle: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    emptyText: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.mutedText,
+    },
+  });
+}

@@ -409,6 +409,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 34,
     paddingHorizontal: 22,
     marginBottom: -60,
+    paddingBottom: 10,
     paddingTop: 18,
   },
   segmentedControl: {

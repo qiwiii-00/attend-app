@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppTheme } from "@/constants/theme";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSession } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api/apiClient";
 import { uploadAvatar } from "@/lib/api/cloudinary-service";
@@ -33,6 +35,8 @@ type ActionItem = {
   disabled?: boolean;
   onPress?: () => void;
 };
+
+type Theme = (typeof AppTheme)["light"];
 
 function formatValue(value?: string | number | null) {
   if (value === null || value === undefined) {
@@ -72,6 +76,8 @@ function splitName(name?: string | null) {
 
 export default function ProfileTabScreen() {
   const { user: sessionUser, signOut, syncUser } = useSession();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [user, setUser] = useState<User | null>(sessionUser);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -210,16 +216,16 @@ export default function ProfileTabScreen() {
     {
       icon: "create-outline",
       label: "Edit Profile",
-      tint: "#1F4C9A",
-      backgroundColor: "#EEF4FF",
+      tint: theme.colors.accentStrong,
+      backgroundColor: theme.colors.surfaceMuted,
       onPress: () => router.push("/profile-edit"),
     },
 
     {
       icon: "log-out-outline",
       label: loggingOut ? "Signing out..." : "Sign Out",
-      tint: "#1F4C9A",
-      backgroundColor: "#EEF4FF",
+      tint: theme.colors.accentStrong,
+      backgroundColor: theme.colors.surfaceMuted,
       disabled: loggingOut,
       onPress: handleLogout,
     },
@@ -237,7 +243,10 @@ export default function ProfileTabScreen() {
 
           {loading ? (
             <View style={styles.loadingBlock}>
-              <ActivityIndicator size="large" color="#1F4C9A" />
+              <ActivityIndicator
+                size="large"
+                color={theme.colors.accentStrong}
+              />
               <Text style={styles.loadingText}>Loading profile...</Text>
             </View>
           ) : (
@@ -263,12 +272,19 @@ export default function ProfileTabScreen() {
 
                     {uploadingAvatar ? (
                       <View style={styles.avatarLoadingOverlay}>
-                        <ActivityIndicator size="small" color="#FFFFFF" />
+                        <ActivityIndicator
+                          size="small"
+                          color={theme.colors.accentContrast}
+                        />
                       </View>
                     ) : null}
                   </View>
                   <View style={styles.cameraBadge}>
-                    <Ionicons name="camera-outline" size={12} color="#FFFFFF" />
+                    <Ionicons
+                      name="camera-outline"
+                      size={12}
+                      color={theme.colors.accentContrast}
+                    />
                   </View>
                 </Pressable>
               </View>
@@ -289,7 +305,11 @@ export default function ProfileTabScreen() {
                 {profileItems.map((item) => (
                   <View key={item.label} style={styles.itemRow}>
                     <View style={styles.itemIconWrap}>
-                      <Ionicons name={item.icon} size={18} color="#1F4C9A" />
+                      <Ionicons
+                        name={item.icon}
+                        size={18}
+                        color={theme.colors.accentStrong}
+                      />
                     </View>
                     <View style={styles.itemTextBlock}>
                       <Text style={styles.itemLabel}>{item.label}</Text>
@@ -299,7 +319,7 @@ export default function ProfileTabScreen() {
                       <Ionicons
                         name="chevron-forward"
                         size={16}
-                        color="#9CA3AF"
+                        color={theme.colors.mutedText}
                       />
                     </View>
                   </View>
@@ -337,7 +357,7 @@ export default function ProfileTabScreen() {
                         <Ionicons
                           name="chevron-forward"
                           size={16}
-                          color="#9CA3AF"
+                          color={theme.colors.mutedText}
                         />
                       </View>
                     </Pressable>
@@ -352,169 +372,175 @@ export default function ProfileTabScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 40,
-  },
-  container: {
-    width: "100%",
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 28,
-  },
-  loadingBlock: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    paddingVertical: 96,
-  },
-  loadingText: {
-    fontSize: 15,
-    color: "#6B7280",
-  },
-  heroRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarWrap: {
-    position: "relative",
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-  },
-  avatarInitials: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#1F2937",
-  },
-  avatarLoadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.35)",
-  },
-  cameraBadge: {
-    position: "absolute",
-    right: -2,
-    bottom: 2,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#1F4C9A",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  nameBlock: {
-    marginTop: 18,
-    alignItems: "center",
-  },
-  primaryName: {
-    fontSize: 33,
-    lineHeight: 36,
-    fontWeight: "800",
-    color: "#0F172A",
-    textAlign: "center",
-  },
-  secondaryName: {
-    fontSize: 33,
-    lineHeight: 36,
-    fontWeight: "300",
-    color: "#9CA3AF",
-    textAlign: "center",
-  },
-  email: {
-    marginTop: 10,
-    fontSize: 14,
-    color: "#6B7280",
-    textAlign: "center",
-  },
-  section: {
-    marginTop: 34,
-    gap: 14,
-  },
-  sectionTitle: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  itemRow: {
-    minHeight: 64,
-    borderRadius: 20,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
-  itemIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#EEF4FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  itemTextBlock: {
-    flex: 1,
-    gap: 3,
-  },
-  itemLabel: {
-    fontSize: 13,
-    color: "#9CA3AF",
-    fontWeight: "600",
-  },
-  itemValue: {
-    fontSize: 14,
-    color: "#111827",
-    fontWeight: "600",
-  },
-  settingsLabel: {
-    flex: 1,
-    fontSize: 15,
-    color: "#111827",
-    fontWeight: "600",
-  },
-  chevronWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#F9FAFB",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.65,
-  },
-});
+function createStyles(theme: Theme) {
+  const isDark = theme.colors.background === AppTheme.dark.colors.background;
+
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    content: {
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: 12,
+      paddingBottom: 40,
+    },
+    container: {
+      width: "100%",
+    },
+    topBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 28,
+    },
+    loadingBlock: {
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+      paddingVertical: 96,
+    },
+    loadingText: {
+      fontSize: 15,
+      color: theme.colors.mutedText,
+    },
+    heroRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarWrap: {
+      position: "relative",
+    },
+    avatar: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: theme.colors.surfaceMuted,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    avatarImage: {
+      width: "100%",
+      height: "100%",
+    },
+    avatarInitials: {
+      fontSize: 26,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    avatarLoadingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: isDark
+        ? "rgba(18, 24, 38, 0.62)"
+        : "rgba(15, 23, 42, 0.35)",
+    },
+    cameraBadge: {
+      position: "absolute",
+      right: -2,
+      bottom: 2,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: theme.colors.accentStrong,
+      borderWidth: 2,
+      borderColor: theme.colors.background,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    nameBlock: {
+      marginTop: 18,
+      alignItems: "center",
+    },
+    primaryName: {
+      fontSize: 33,
+      lineHeight: 36,
+      fontWeight: "800",
+      color: theme.colors.heading,
+      textAlign: "center",
+    },
+    secondaryName: {
+      fontSize: 33,
+      lineHeight: 36,
+      fontWeight: "300",
+      color: theme.colors.mutedText,
+      textAlign: "center",
+    },
+    email: {
+      marginTop: 10,
+      fontSize: 14,
+      color: theme.colors.mutedText,
+      textAlign: "center",
+    },
+    section: {
+      marginTop: 34,
+      gap: 14,
+    },
+    sectionTitle: {
+      fontSize: 26,
+      fontWeight: "700",
+      color: theme.colors.heading,
+    },
+    itemRow: {
+      minHeight: 64,
+      borderRadius: 20,
+      backgroundColor: theme.colors.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      ...theme.shadow.soft,
+    },
+    itemIconWrap: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: theme.colors.surfaceMuted,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    itemTextBlock: {
+      flex: 1,
+      gap: 3,
+    },
+    itemLabel: {
+      fontSize: 13,
+      color: theme.colors.mutedText,
+      fontWeight: "600",
+    },
+    itemValue: {
+      fontSize: 14,
+      color: theme.colors.heading,
+      fontWeight: "600",
+    },
+    settingsLabel: {
+      flex: 1,
+      fontSize: 15,
+      color: theme.colors.heading,
+      fontWeight: "600",
+    },
+    chevronWrap: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: theme.colors.surfaceMuted,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    buttonDisabled: {
+      opacity: 0.65,
+    },
+  });
+}

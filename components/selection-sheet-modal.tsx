@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   Animated,
   Modal,
@@ -9,6 +9,9 @@ import {
   Text,
   View,
 } from "react-native";
+
+import { AppTheme } from "@/constants/theme";
+import { useAppTheme } from "@/hooks/use-app-theme";
 
 type OptionItem = {
   label: string;
@@ -25,6 +28,8 @@ type SelectionSheetModalProps = {
   onClose: () => void;
 };
 
+type Theme = (typeof AppTheme)["light"];
+
 export function SelectionSheetModal({
   visible,
   title,
@@ -33,6 +38,8 @@ export function SelectionSheetModal({
   onSelect,
   onClose,
 }: SelectionSheetModalProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const translateY = useRef(new Animated.Value(320)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
@@ -82,7 +89,11 @@ export function SelectionSheetModal({
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             <Pressable onPress={onClose} hitSlop={8}>
-              <Ionicons name="close-outline" size={24} color="#334155" />
+              <Ionicons
+                name="close-outline"
+                size={24}
+                color={theme.colors.mutedText}
+              />
             </Pressable>
           </View>
 
@@ -119,7 +130,7 @@ export function SelectionSheetModal({
                     <Ionicons
                       name="checkmark-circle"
                       size={22}
-                      color="#2563EB"
+                      color={theme.colors.accentStrong}
                     />
                   ) : null}
                 </Pressable>
@@ -132,76 +143,81 @@ export function SelectionSheetModal({
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(15, 23, 42, 0.38)",
-  },
-  sheet: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 28,
-    maxHeight: "72%",
-  },
-  handle: {
-    alignSelf: "center",
-    width: 48,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: "#CBD5E1",
-    marginBottom: 14,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#0F172A",
-  },
-  content: {
-    gap: 12,
-    paddingBottom: 8,
-  },
-  option: {
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  optionSelected: {
-    borderColor: "#93C5FD",
-    backgroundColor: "#EFF6FF",
-  },
-  optionText: {
-    flex: 1,
-    gap: 2,
-  },
-  optionLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1E293B",
-  },
-  optionLabelSelected: {
-    color: "#1D4ED8",
-  },
-  optionSubtitle: {
-    fontSize: 13,
-    color: "#64748B",
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(15, 23, 42, 0.38)",
+    },
+    sheet: {
+      backgroundColor: theme.colors.surfaceElevated,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 28,
+      maxHeight: "72%",
+      borderTopWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    handle: {
+      alignSelf: "center",
+      width: 48,
+      height: 5,
+      borderRadius: 999,
+      backgroundColor: theme.colors.border,
+      marginBottom: 14,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 16,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: theme.colors.heading,
+    },
+    content: {
+      gap: 12,
+      paddingBottom: 8,
+    },
+    option: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      backgroundColor: theme.colors.card,
+    },
+    optionSelected: {
+      borderColor: theme.colors.accent,
+      backgroundColor: theme.colors.surfaceMuted,
+    },
+    optionText: {
+      flex: 1,
+      gap: 2,
+    },
+    optionLabel: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: theme.colors.heading,
+    },
+    optionLabelSelected: {
+      color: theme.colors.accentStrong,
+    },
+    optionSubtitle: {
+      fontSize: 13,
+      color: theme.colors.mutedText,
+    },
+  });
+}

@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppTheme } from "@/constants/theme";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { ApiError } from "@/lib/api/apiClient";
 import { useSession } from "@/lib/auth-context";
 import {
@@ -35,6 +37,8 @@ type ScheduleItem = {
   subjectCode: string | null;
   state: "done" | "upcoming" | "inactive";
 };
+
+type Theme = (typeof AppTheme)["light"];
 
 const WEEKDAY_KEYS = [
   "sunday",
@@ -186,38 +190,40 @@ function buildSchedule(
     .filter((item): item is ScheduleItem => item !== null);
 }
 
-function getItemColors(state: ScheduleItem["state"]) {
+function getItemColors(theme: Theme, state: ScheduleItem["state"]) {
   if (state === "done") {
     return {
-      line: "#D2D8E5",
-      iconBg: "#2D4A86",
-      cardBg: "#CFD8F7",
-      text: "#111111",
-      muted: "#8C95A8",
+      line: theme.colors.border,
+      iconBg: theme.colors.accentStrong,
+      cardBg: theme.colors.accentSoft,
+      text: theme.colors.heading,
+      muted: theme.colors.mutedText,
     };
   }
 
   if (state === "inactive") {
     return {
-      line: "#E0E3EA",
-      iconBg: "#D9DCE4",
-      cardBg: "#D8DAE0",
-      text: "#A3A8B4",
-      muted: "#AEB4C1",
+      line: theme.colors.border,
+      iconBg: theme.colors.surfaceMuted,
+      cardBg: theme.colors.surfaceMuted,
+      text: theme.colors.subtleText,
+      muted: theme.colors.subtleText,
     };
   }
 
   return {
-    line: "#D2D8E5",
-    iconBg: "#2D4A86",
-    cardBg: "#CFD8F7",
-    text: "#111111",
-    muted: "#8C95A8",
+    line: theme.colors.border,
+    iconBg: theme.colors.accentStrong,
+    cardBg: theme.colors.card,
+    text: theme.colors.heading,
+    muted: theme.colors.mutedText,
   };
 }
 
 export default function UpcomingClassScreen() {
   const { user } = useSession();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const weekDays = useMemo(() => getWeekDays(), []);
 
   const currentDayKey = useMemo(() => {
@@ -304,7 +310,11 @@ export default function UpcomingClassScreen() {
       >
         <View style={styles.headerRow}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ChevronLeft size={20} color="#111111" strokeWidth={2.5} />
+            <ChevronLeft
+              size={20}
+              color={theme.colors.heading}
+              strokeWidth={2.5}
+            />
           </Pressable>
           <Text style={styles.title}>Upcoming Class</Text>
         </View>
@@ -357,13 +367,13 @@ export default function UpcomingClassScreen() {
 
         {loading ? (
           <View style={styles.loadingState}>
-            <ActivityIndicator size="large" color="#2D4A86" />
+            <ActivityIndicator size="large" color={theme.colors.accentStrong} />
             <Text style={styles.loadingText}>Loading schedule...</Text>
           </View>
         ) : scheduleItems.length > 0 ? (
           <View style={styles.timeline}>
             {scheduleItems.map((item, index) => {
-              const colors = getItemColors(item.state);
+              const colors = getItemColors(theme, item.state);
 
               return (
                 <View key={item.id} style={styles.timelineRow}>
@@ -375,7 +385,11 @@ export default function UpcomingClassScreen() {
                       ]}
                     >
                       {item.state === "done" || item.state === "upcoming" ? (
-                        <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                        <Check
+                          size={12}
+                          color={theme.colors.accentContrast}
+                          strokeWidth={3}
+                        />
                       ) : null}
                     </View>
                     {index < scheduleItems.length - 1 ? (
@@ -424,167 +438,177 @@ export default function UpcomingClassScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 36,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F4F7FE",
-  },
-  title: {
-    fontSize: 29,
-    lineHeight: 35,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  monthTitle: {
-    marginTop: 18,
-    textAlign: "center",
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  dayStrip: {
-    marginTop: 10,
-    flexDirection: "row",
-    borderRadius: 14,
-    backgroundColor: "#d5e2fc",
-    overflow: "hidden",
-  },
-  dayChip: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    gap: 2,
-  },
-  dayChipActive: {
-    backgroundColor: "#29417b",
-  },
-  dayChipWeek: {
-    fontSize: 14,
-    color: "#9BA2B2",
-  },
-  dayChipWeekActive: {
-    color: "#FFFFFF",
-  },
-  dayChipDate: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#B2B7C5",
-  },
-  dayChipDateActive: {
-    color: "#FFFFFF",
-  },
-  dayHeader: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 12,
-    marginTop: 24,
-  },
-  dayName: {
-    fontSize: 18,
-    fontWeight: "400",
-    color: "#111111",
-  },
-  dayDate: {
-    fontSize: 15,
-    color: "#3A3A3A",
-  },
-  loadingState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 80,
-    gap: 10,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: "#6C7487",
-  },
-  timeline: {
-    marginTop: 16,
-    gap: 6,
-  },
-  timelineRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    minHeight: 96,
-  },
-  timelineRail: {
-    width: 24,
-    alignItems: "center",
-    marginRight: 14,
-  },
-  timelineDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  timelineLine: {
-    width: 1,
-    flex: 1,
-    marginTop: 6,
-  },
-  timelineContent: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  timeText: {
-    width: 86,
-    fontSize: 11,
-  },
-  classCard: {
-    flex: 1,
-    borderRadius: 12,
-    minHeight: 44,
-    paddingHorizontal: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  classTitle: {
-    fontSize: 15,
-    textAlign: "center",
-  },
-  emptyState: {
-    marginTop: 28,
-    borderRadius: 18,
-    backgroundColor: "#F7F9FC",
-    padding: 20,
-    gap: 6,
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  emptyText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#71798B",
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      paddingBottom: 36,
+    },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    title: {
+      fontSize: 29,
+      lineHeight: 35,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    monthTitle: {
+      marginTop: 18,
+      textAlign: "center",
+      fontSize: 18,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    dayStrip: {
+      marginTop: 10,
+      flexDirection: "row",
+      borderRadius: 14,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      overflow: "hidden",
+    },
+    dayChip: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 10,
+      gap: 2,
+    },
+    dayChipActive: {
+      backgroundColor: theme.colors.accentStrong,
+    },
+    dayChipWeek: {
+      fontSize: 14,
+      color: theme.colors.mutedText,
+    },
+    dayChipWeekActive: {
+      color: theme.colors.accentContrast,
+    },
+    dayChipDate: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: theme.colors.subtleText,
+    },
+    dayChipDateActive: {
+      color: theme.colors.accentContrast,
+    },
+    dayHeader: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      gap: 12,
+      marginTop: 24,
+    },
+    dayName: {
+      fontSize: 18,
+      fontWeight: "400",
+      color: theme.colors.heading,
+    },
+    dayDate: {
+      fontSize: 15,
+      color: theme.colors.text,
+    },
+    loadingState: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 80,
+      gap: 10,
+    },
+    loadingText: {
+      fontSize: 14,
+      color: theme.colors.mutedText,
+    },
+    timeline: {
+      marginTop: 16,
+      gap: 6,
+    },
+    timelineRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      minHeight: 96,
+    },
+    timelineRail: {
+      width: 24,
+      alignItems: "center",
+      marginRight: 14,
+    },
+    timelineDot: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 8,
+    },
+    timelineLine: {
+      width: 1,
+      flex: 1,
+      marginTop: 6,
+    },
+    timelineContent: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    timeText: {
+      width: 86,
+      fontSize: 11,
+    },
+    classCard: {
+      flex: 1,
+      borderRadius: 12,
+      minHeight: 44,
+      paddingHorizontal: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    classTitle: {
+      fontSize: 15,
+      textAlign: "center",
+    },
+    emptyState: {
+      marginTop: 28,
+      borderRadius: 18,
+      backgroundColor: theme.colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 20,
+      gap: 6,
+    },
+    emptyTitle: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    emptyText: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.mutedText,
+    },
+  });
+}

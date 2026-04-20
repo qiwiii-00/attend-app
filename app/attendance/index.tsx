@@ -19,6 +19,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ApiError } from "@/lib/api/apiClient";
+import { AppTheme } from "@/constants/theme";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import {
   getAttendances,
   getUserAttendanceSummary,
@@ -56,6 +58,8 @@ type AttendanceSummaryTotals = {
   late: number;
   absent: number;
 };
+
+type Theme = (typeof AppTheme)["light"];
 
 function getAttendanceDate(attendance: AttendanceRecord) {
   const parsed = new Date(attendance.scanned_at ?? attendance.created_at);
@@ -207,20 +211,34 @@ function getSummaryTotals(
   };
 }
 
-function getStatusColors(status: AttendanceRecord["status"]) {
+function getStatusColors(theme: Theme, status: AttendanceRecord["status"]) {
   if (status === "present") {
-    return { bg: "#EAF8EE", fg: "#207A3C", label: "Present" };
+    return {
+      bg: theme.colors.surfaceSoft,
+      fg: theme.colors.info,
+      label: "Present",
+    };
   }
 
   if (status === "late") {
-    return { bg: "#FFF3DB", fg: "#A66200", label: "Late" };
+    return {
+      bg: theme.colors.infoSoft,
+      fg: theme.colors.accentStrong,
+      label: "Late",
+    };
   }
 
-  return { bg: "#FFE7E7", fg: "#B33535", label: "Absent" };
+  return {
+    bg: theme.colors.cardAccent,
+    fg: theme.colors.accentStrong,
+    label: "Absent",
+  };
 }
 
 export default function AttendanceScreen() {
   const { user } = useSession();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
@@ -336,7 +354,11 @@ export default function AttendanceScreen() {
       >
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={20} color="#111111" strokeWidth={2.3} />
+            <ArrowLeft
+              size={20}
+              color={theme.colors.heading}
+              strokeWidth={2.3}
+            />
           </Pressable>
           <View style={styles.headerText}>
             <Text style={styles.title}>My Attendance</Text>
@@ -348,7 +370,7 @@ export default function AttendanceScreen() {
 
         {loading ? (
           <View style={styles.loadingState}>
-            <ActivityIndicator size="large" color="#39508A" />
+            <ActivityIndicator size="large" color={theme.colors.accentStrong} />
             <Text style={styles.loadingText}>
               Loading attendance details...
             </Text>
@@ -387,7 +409,11 @@ export default function AttendanceScreen() {
                   {selectedRangeMeta.title}
                 </Text>
                 <View style={styles.summaryChip}>
-                  <CalendarDays size={14} color="#39508A" strokeWidth={2.2} />
+                  <CalendarDays
+                    size={14}
+                    color={theme.colors.accentStrong}
+                    strokeWidth={2.2}
+                  />
                   <Text style={styles.summaryChipText}>
                     {summaryTotals.total} classes
                   </Text>
@@ -395,22 +421,48 @@ export default function AttendanceScreen() {
               </View>
 
               <View style={styles.summaryStats}>
-                <View style={[styles.statTile, { backgroundColor: "#EAF8EE" }]}>
-                  <Check size={18} color="#207A3C" strokeWidth={2.5} />
+                <View style={styles.statTile}>
+                  <Check
+                    size={18}
+                    color={getStatusColors(theme, "present").fg}
+                    strokeWidth={2.5}
+                  />
                   <Text style={styles.statValue}>
                     {summaryLoading ? "..." : summaryTotals.present}
                   </Text>
                   <Text style={styles.statLabel}>Present</Text>
                 </View>
-                <View style={[styles.statTile, { backgroundColor: "#FFF3DB" }]}>
-                  <Clock3 size={18} color="#A66200" strokeWidth={2.5} />
+                <View
+                  style={[
+                    styles.statTile,
+                    {
+                      backgroundColor: getStatusColors(theme, "late").bg,
+                    },
+                  ]}
+                >
+                  <Clock3
+                    size={18}
+                    color={getStatusColors(theme, "late").fg}
+                    strokeWidth={2.5}
+                  />
                   <Text style={styles.statValue}>
                     {summaryLoading ? "..." : summaryTotals.late}
                   </Text>
                   <Text style={styles.statLabel}>Leave Granted</Text>
                 </View>
-                <View style={[styles.statTile, { backgroundColor: "#FFE7E7" }]}>
-                  <XCircle size={18} color="#B33535" strokeWidth={2.5} />
+                <View
+                  style={[
+                    styles.statTile,
+                    {
+                      backgroundColor: getStatusColors(theme, "absent").bg,
+                    },
+                  ]}
+                >
+                  <XCircle
+                    size={18}
+                    color={getStatusColors(theme, "absent").fg}
+                    strokeWidth={2.5}
+                  />
                   <Text style={styles.statValue}>
                     {summaryLoading ? "..." : summaryTotals.absent}
                   </Text>
@@ -451,208 +503,220 @@ export default function AttendanceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 36,
-    gap: 18,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#F4F6FB",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerText: {
-    flex: 1,
-    gap: 2,
-  },
-  title: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#596273",
-  },
-  loadingState: {
-    paddingVertical: 80,
-    alignItems: "center",
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: "#667085",
-  },
-  filterTabs: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#DCE7F1",
-    borderRadius: 999,
-    padding: 6,
-    gap: 6,
-  },
-  filterTab: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
-  },
-  filterTabActive: {
-    backgroundColor: "#171717",
-  },
-  filterTabText: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#171717",
-  },
-  filterTabTextActive: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
-  summaryCard: {
-    backgroundColor: "#658caf",
-    borderRadius: 24,
-    padding: 18,
-    gap: 16,
-  },
-  summaryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  summaryTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  summaryChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 999,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  summaryChipText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#39508A",
-  },
-  summaryStats: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  statTile: {
-    flex: 1,
-    flexDirection: "column",
-    borderRadius: 18,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 6,
-  },
-  statValue: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#111111",
-    textAlign: "center",
-  },
-  statLabel: {
-    fontSize: 13,
-    color: "#4B5563",
-    textAlign: "center",
-  },
-  section: {
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  emptyCard: {
-    borderRadius: 18,
-    backgroundColor: "#F8FAFC",
-    padding: 18,
-    gap: 6,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#111111",
-  },
-  emptyCopy: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#667085",
-  },
-  historyGroup: {
-    gap: 10,
-  },
-  groupLabel: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#5C6780",
-    textTransform: "uppercase",
-  },
-  historyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: "#E9EDF5",
-  },
-  historyText: {
-    flex: 1,
-    gap: 4,
-  },
-  historySubject: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111111",
-  },
-  historyTime: {
-    fontSize: 13,
-    color: "#667085",
-  },
-  statusPill: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "800",
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      paddingBottom: 36,
+      gap: 18,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+    },
+    backButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerText: {
+      flex: 1,
+      gap: 2,
+    },
+    title: {
+      fontSize: 28,
+      lineHeight: 34,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    subtitle: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.mutedText,
+    },
+    loadingState: {
+      paddingVertical: 80,
+      alignItems: "center",
+      gap: 12,
+    },
+    loadingText: {
+      fontSize: 14,
+      color: theme.colors.mutedText,
+    },
+    filterTabs: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.colors.surfaceMuted,
+      borderRadius: theme.radius.pill,
+      padding: 6,
+      gap: 6,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    filterTab: {
+      flex: 1,
+      minHeight: 40,
+      borderRadius: theme.radius.pill,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 12,
+    },
+    filterTabActive: {
+      backgroundColor: theme.colors.accentStrong,
+    },
+    filterTabText: {
+      fontSize: 15,
+      fontWeight: "500",
+      color: theme.colors.heading,
+    },
+    filterTabTextActive: {
+      color: theme.colors.accentContrast,
+      fontWeight: "700",
+    },
+    summaryCard: {
+      backgroundColor: theme.colors.card,
+      borderRadius: 24,
+      padding: 18,
+      gap: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      ...theme.shadow.card,
+    },
+    summaryHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    summaryTitle: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    summaryChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderRadius: theme.radius.pill,
+      backgroundColor: theme.colors.surfaceMuted,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    summaryChipText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.colors.accentStrong,
+    },
+    summaryStats: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    statTile: {
+      flex: 1,
+      flexDirection: "column",
+      backgroundColor: "rgba(0, 0, 0, 0.05)",
+      borderRadius: 18,
+      paddingVertical: 16,
+      paddingHorizontal: 12,
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 6,
+    },
+    statValue: {
+      fontSize: 22,
+      fontWeight: "800",
+      color: theme.colors.heading,
+      textAlign: "center",
+    },
+    statLabel: {
+      fontSize: 13,
+      color: theme.colors.mutedText,
+      textAlign: "center",
+    },
+    section: {
+      gap: 12,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    emptyCard: {
+      borderRadius: 18,
+      backgroundColor: theme.colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 18,
+      gap: 6,
+    },
+    emptyTitle: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: theme.colors.heading,
+    },
+    emptyCopy: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.mutedText,
+    },
+    historyGroup: {
+      gap: 10,
+    },
+    groupLabel: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: theme.colors.mutedText,
+      textTransform: "uppercase",
+    },
+    historyRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      backgroundColor: theme.colors.card,
+      borderRadius: 18,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    historyText: {
+      flex: 1,
+      gap: 4,
+    },
+    historySubject: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: theme.colors.heading,
+    },
+    historyTime: {
+      fontSize: 13,
+      color: theme.colors.mutedText,
+    },
+    statusPill: {
+      borderRadius: theme.radius.pill,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: "800",
+    },
+  });
+}
