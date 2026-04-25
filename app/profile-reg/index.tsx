@@ -22,26 +22,9 @@ import { ApiError } from "@/lib/api/apiClient";
 import { uploadAvatar } from "@/lib/api/cloudinary-service";
 import { getCourses, type Course } from "@/lib/api/course-service";
 import { getSemesters, type Semester } from "@/lib/api/semester-service";
-import {
-  createStaffDetail,
-  getStaffDetails,
-  type SaveStaffDetailPayload,
-  type StaffDetailRecord,
-  type UpdateStaffDetailPayload,
-  updateStaffDetail,
-} from "@/lib/api/staff-detail-service";
 import { useSession } from "@/lib/auth-context";
 import { updateUser, type User } from "@/lib/api/user-service";
 
-const roleOptions = ["Student", "Teacher", "Admin", "Receptionist"] as const;
-const staffRoleOptions = roleOptions.filter((role) => role !== "Student");
-const staffPositionOptions = [
-  "Faculty",
-  "Course Coordinator",
-  "Academic Head",
-  "Receptionist",
-  "Academic Admin",
-] as const;
 type Theme = (typeof AppTheme)["light"];
 
 function showSuccessMessage(message: string) {
@@ -75,44 +58,6 @@ function getInitials(name?: string | null) {
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
-function getRoleFlags(role: (typeof roleOptions)[number]) {
-  return {
-    is_admin: role === "Admin",
-    is_teacher: role === "Teacher",
-    is_receptionist: role === "Receptionist",
-  };
-}
-
-function buildStaffDetailPayload(
-  role: (typeof roleOptions)[number],
-  values: {
-    position: string;
-    phone1: string;
-    phone2: string;
-    notes: string;
-  },
-) {
-  return {
-    position: values.position.trim() || null,
-    phone_1: values.phone1.trim() || null,
-    phone_2: values.phone2.trim() || null,
-    notes: values.notes.trim() || null,
-    is_admin: false,
-    is_teacher: false,
-    is_receptionist: false,
-    ...getRoleFlags(role),
-  };
-}
-
-async function findExistingStaffDetail(userId: number) {
-  const response = await getStaffDetails();
-  return (
-    normalizeListResponse<StaffDetailRecord>(response).find(
-      (staffDetail) => staffDetail.user_id === userId,
-    ) ?? null
-  );
-}
-
 export default function ProfileCompleteScreen() {
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -122,19 +67,10 @@ export default function ProfileCompleteScreen() {
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [name, setName] = useState("");
   const [studentId, setStudentId] = useState("");
-  const [selectedRole, setSelectedRole] =
-    useState<(typeof roleOptions)[number]>("Student");
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
   const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(
     null,
   );
-  const [staffDetailId, setStaffDetailId] = useState<number | null>(null);
-  const [staffPosition, setStaffPosition] = useState("");
-  const [staffPhone1, setStaffPhone1] = useState("");
-  const [staffPhone2, setStaffPhone2] = useState("");
-  const [staffNotes, setStaffNotes] = useState("");
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [showPositionModal, setShowPositionModal] = useState(false);
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [showSemesterModal, setShowSemesterModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -145,13 +81,13 @@ export default function ProfileCompleteScreen() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [currentUser, courseResponse, semesterResponse, staffResponse] =
-          await Promise.all([
+        const [currentUser, courseResponse, semesterResponse] = await Promise.all(
+          [
             sessionUser ? Promise.resolve(sessionUser) : refreshSession(),
             getCourses(),
             getSemesters(),
-            getStaffDetails(),
-          ]);
+          ],
+        );
 
         if (!currentUser) {
           setUser(null);
@@ -161,24 +97,12 @@ export default function ProfileCompleteScreen() {
         setUser(currentUser);
         setCourses(normalizeListResponse<Course>(courseResponse));
         setSemesters(normalizeListResponse<Semester>(semesterResponse));
-        const currentStaffDetail =
-          normalizeListResponse<StaffDetailRecord>(staffResponse).find(
-            (staffDetail) => staffDetail.user_id === currentUser.id,
-          ) ?? null;
 
         if (initializedUserIdRef.current !== currentUser.id) {
           setName(currentUser.name ?? "");
           setStudentId(currentUser.student_id ?? "");
-          setSelectedRole(
-            roleOptions.find((role) => role === currentUser.role) ?? "Student",
-          );
           setSelectedCourseId(currentUser.course_id ?? null);
           setSelectedSemesterId(currentUser.semester_id ?? null);
-          setStaffDetailId(currentStaffDetail?.id ?? null);
-          setStaffPosition(currentStaffDetail?.position ?? "");
-          setStaffPhone1(currentStaffDetail?.phone_1 ?? "");
-          setStaffPhone2(currentStaffDetail?.phone_2 ?? "");
-          setStaffNotes(currentStaffDetail?.notes ?? "");
           initializedUserIdRef.current = currentUser.id;
         }
       } catch (error) {
@@ -211,16 +135,6 @@ export default function ProfileCompleteScreen() {
   const selectedSemester = semesters.find(
     (semester) => semester.id === selectedSemesterId,
   );
-  const isStudentRole = selectedRole === "Student";
-  const isStaffRole = !isStudentRole;
-
-  function handleRoleSelect(role: (typeof roleOptions)[number]) {
-    setSelectedRole(role);
-
-    if (role === "Receptionist") {
-      setStaffPosition("Receptionist");
-    }
-  }
 
   async function handlePickAvatar() {
     if (uploadingAvatar) {
@@ -290,18 +204,13 @@ export default function ProfileCompleteScreen() {
       return;
     }
 
-    if (isStudentRole && !selectedCourseId) {
+    if (!selectedCourseId) {
       Alert.alert("Missing fields", "Please select a course.");
       return;
     }
 
-    if (isStudentRole && !selectedSemesterId) {
+    if (!selectedSemesterId) {
       Alert.alert("Missing fields", "Please select a semester.");
-      return;
-    }
-
-    if (isStaffRole && !staffPosition.trim()) {
-      Alert.alert("Missing fields", "Position is required for staff roles.");
       return;
     }
 
@@ -310,42 +219,14 @@ export default function ProfileCompleteScreen() {
 
       const response = await updateUser(user.id, {
         name: name.trim(),
-        role: selectedRole,
-        student_id: isStudentRole ? studentId.trim() || null : null,
-        course_id: isStudentRole ? selectedCourseId : null,
-        semester_id: isStudentRole ? selectedSemesterId : null,
+        role: "Student",
+        student_id: studentId.trim() || null,
+        course_id: selectedCourseId,
+        semester_id: selectedSemesterId,
       });
 
       setUser(response.data);
       syncUser(response.data);
-
-      if (isStaffRole) {
-        const staffFields = buildStaffDetailPayload(selectedRole, {
-          position: staffPosition,
-          phone1: staffPhone1,
-          phone2: staffPhone2,
-          notes: staffNotes,
-        });
-
-        const existingStaffDetail =
-          staffDetailId ? { id: staffDetailId } : await findExistingStaffDetail(response.data.id);
-
-        const staffResponse = existingStaffDetail
-          ? await updateStaffDetail(
-              existingStaffDetail.id,
-              staffFields satisfies UpdateStaffDetailPayload,
-            )
-          : await createStaffDetail({
-              user_id: response.data.id,
-              ...staffFields,
-            } satisfies SaveStaffDetailPayload);
-
-        setStaffDetailId(staffResponse.data.id);
-        setStaffPosition(staffResponse.data.position ?? "");
-        setStaffPhone1(staffResponse.data.phone_1 ?? "");
-        setStaffPhone2(staffResponse.data.phone_2 ?? "");
-        setStaffNotes(staffResponse.data.notes ?? "");
-      }
 
       showSuccessMessage("Profile completed");
       router.replace("/(tabs)/home" as Href);
@@ -482,17 +363,54 @@ export default function ProfileCompleteScreen() {
 
           <View style={styles.fieldBlock}>
             <Text style={styles.label}>Role</Text>
+            <View style={styles.readonlyField}>
+              <Ionicons
+                name="people-outline"
+                size={18}
+                color={theme.colors.accentStrong}
+              />
+              <Text style={styles.readonlyValue}>Student</Text>
+            </View>
+          </View>
+
+          <View style={styles.fieldBlock}>
+            <Text style={styles.label}>Student ID</Text>
+            <View style={styles.inputShell}>
+              <Ionicons
+                name="card-outline"
+                size={18}
+                color={theme.colors.accentStrong}
+              />
+              <TextInput
+                value={studentId}
+                onChangeText={setStudentId}
+                placeholder="Student ID"
+                placeholderTextColor={theme.colors.mutedText}
+                style={styles.input}
+              />
+            </View>
+          </View>
+
+          <View style={styles.fieldBlock}>
+            <Text style={styles.label}>Course</Text>
             <Pressable
               style={styles.selector}
-              onPress={() => setShowRoleModal(true)}
+              onPress={() => setShowCourseModal(true)}
             >
               <View style={styles.selectorLeft}>
                 <Ionicons
-                  name="people-outline"
+                  name="library-outline"
                   size={18}
                   color={theme.colors.accentStrong}
                 />
-                <Text style={styles.selectorText}>{selectedRole}</Text>
+                <Text
+                  style={[
+                    styles.selectorText,
+                    !selectedCourse && styles.selectorPlaceholder,
+                  ]}
+                >
+                  {selectedCourse?.title ?? "Choose a course"}
+                </Text>
               </View>
               <Ionicons
                 name="chevron-forward"
@@ -501,187 +419,48 @@ export default function ProfileCompleteScreen() {
               />
             </Pressable>
           </View>
-          {isStudentRole ? (
-            <>
-              <View style={styles.fieldBlock}>
-                <Text style={styles.label}>Student ID</Text>
-                <View style={styles.inputShell}>
-                  <Ionicons
-                    name="card-outline"
-                    size={18}
-                    color={theme.colors.accentStrong}
-                  />
-                  <TextInput
-                    value={studentId}
-                    onChangeText={setStudentId}
-                    placeholder="Student ID"
-                    placeholderTextColor={theme.colors.mutedText}
-                    style={styles.input}
-                  />
-                </View>
-              </View>
-              <View style={styles.fieldBlock}>
-                <Text style={styles.label}>Course</Text>
-                <Pressable
-                  style={styles.selector}
-                  onPress={() => setShowCourseModal(true)}
-                >
-                  <View style={styles.selectorLeft}>
-                    <Ionicons
-                      name="library-outline"
-                      size={18}
-                      color={theme.colors.accentStrong}
-                    />
-                    <Text
-                      style={[
-                        styles.selectorText,
-                        !selectedCourse && styles.selectorPlaceholder,
-                      ]}
-                    >
-                      {selectedCourse?.title ?? "Choose a course"}
-                    </Text>
-                  </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    color={theme.colors.mutedText}
-                  />
-                </Pressable>
-              </View>
 
-              <View style={styles.fieldBlock}>
-                <Text style={styles.label}>Semester</Text>
-                <Pressable
+          <View style={styles.fieldBlock}>
+            <Text style={styles.label}>Semester</Text>
+            <Pressable
+              style={[
+                styles.selector,
+                !selectedCourseId && styles.selectorDisabled,
+              ]}
+              onPress={() => {
+                if (!selectedCourseId) {
+                  Alert.alert(
+                    "Select course first",
+                    "Choose a course before selecting a semester.",
+                  );
+                  return;
+                }
+
+                setShowSemesterModal(true);
+              }}
+            >
+              <View style={styles.selectorLeft}>
+                <Ionicons
+                  name="albums-outline"
+                  size={18}
+                  color={theme.colors.accentStrong}
+                />
+                <Text
                   style={[
-                    styles.selector,
-                    !selectedCourseId && styles.selectorDisabled,
+                    styles.selectorText,
+                    !selectedSemester && styles.selectorPlaceholder,
                   ]}
-                  onPress={() => {
-                    if (!selectedCourseId) {
-                      Alert.alert(
-                        "Select course first",
-                        "Choose a course before selecting a semester.",
-                      );
-                      return;
-                    }
-
-                    setShowSemesterModal(true);
-                  }}
                 >
-                  <View style={styles.selectorLeft}>
-                    <Ionicons
-                      name="albums-outline"
-                      size={18}
-                      color={theme.colors.accentStrong}
-                    />
-                    <Text
-                      style={[
-                        styles.selectorText,
-                        !selectedSemester && styles.selectorPlaceholder,
-                      ]}
-                    >
-                      {selectedSemester?.title ?? "Choose a semester"}
-                    </Text>
-                  </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    color={theme.colors.mutedText}
-                  />
-                </Pressable>
+                  {selectedSemester?.title ?? "Choose a semester"}
+                </Text>
               </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.fieldBlock}>
-                <Text style={styles.label}>Position</Text>
-                <Pressable
-                  style={styles.selector}
-                  onPress={() => setShowPositionModal(true)}
-                >
-                  <View style={styles.selectorLeft}>
-                    <Ionicons
-                      name="briefcase-outline"
-                      size={18}
-                      color={theme.colors.accentStrong}
-                    />
-                    <Text
-                      style={[
-                        styles.selectorText,
-                        !staffPosition && styles.selectorPlaceholder,
-                      ]}
-                    >
-                      {staffPosition || "Choose a position"}
-                    </Text>
-                  </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    color={theme.colors.mutedText}
-                  />
-                </Pressable>
-              </View>
-
-              <View style={styles.fieldBlock}>
-                <Text style={styles.label}>Primary Phone</Text>
-                <View style={styles.inputShell}>
-                  <Ionicons
-                    name="call-outline"
-                    size={18}
-                    color={theme.colors.accentStrong}
-                  />
-                  <TextInput
-                    value={staffPhone1}
-                    onChangeText={setStaffPhone1}
-                    placeholder="Primary phone number"
-                    placeholderTextColor={theme.colors.mutedText}
-                    keyboardType="phone-pad"
-                    style={styles.input}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.fieldBlock}>
-                <Text style={styles.label}>Secondary Phone</Text>
-                <View style={styles.inputShell}>
-                  <Ionicons
-                    name="call-outline"
-                    size={18}
-                    color={theme.colors.accentStrong}
-                  />
-                  <TextInput
-                    value={staffPhone2}
-                    onChangeText={setStaffPhone2}
-                    placeholder="Secondary phone number"
-                    placeholderTextColor={theme.colors.mutedText}
-                    keyboardType="phone-pad"
-                    style={styles.input}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.fieldBlock}>
-                <Text style={styles.label}>Notes</Text>
-                <View style={[styles.inputShell, styles.inputShellMultiline]}>
-                  <Ionicons
-                    name="document-text-outline"
-                    size={18}
-                    color={theme.colors.accentStrong}
-                  />
-                  <TextInput
-                    value={staffNotes}
-                    onChangeText={setStaffNotes}
-                    placeholder="Add any helpful staff notes"
-                    placeholderTextColor={theme.colors.mutedText}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                    style={[styles.input, styles.multilineInput]}
-                  />
-                </View>
-              </View>
-            </>
-          )}
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={theme.colors.mutedText}
+              />
+            </Pressable>
+          </View>
 
           <Pressable
             style={[
@@ -699,36 +478,7 @@ export default function ProfileCompleteScreen() {
       </ScrollView>
 
       <SelectionSheetModal
-        visible={showRoleModal}
-        title="Select Role"
-        options={roleOptions.map((role) => ({
-          value: role,
-          label: role,
-          subtitle: staffRoleOptions.includes(role)
-            ? "Uses staff details"
-            : undefined,
-        }))}
-        selectedValue={selectedRole}
-        onSelect={(value) =>
-          handleRoleSelect(value as (typeof roleOptions)[number])
-        }
-        onClose={() => setShowRoleModal(false)}
-      />
-
-      <SelectionSheetModal
-        visible={showPositionModal && isStaffRole}
-        title="Select Position"
-        options={staffPositionOptions.map((position) => ({
-          value: position,
-          label: position,
-        }))}
-        selectedValue={staffPosition}
-        onSelect={(value) => setStaffPosition(String(value))}
-        onClose={() => setShowPositionModal(false)}
-      />
-
-      <SelectionSheetModal
-        visible={showCourseModal && isStudentRole}
+        visible={showCourseModal}
         title="Select Course"
         options={courses.map((course) => ({
           value: course.id,
@@ -745,7 +495,7 @@ export default function ProfileCompleteScreen() {
       />
 
       <SelectionSheetModal
-        visible={showSemesterModal && isStudentRole}
+        visible={showSemesterModal}
         title="Select Semester"
         options={availableSemesters.map((semester) => ({
           value: semester.id,

@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -14,6 +14,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AppTheme } from "@/constants/theme";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { ApiError } from "@/lib/api/apiClient";
 import { getPostAuthRoute, useSession } from "@/lib/auth-context";
 
@@ -61,8 +63,12 @@ function showSuccessMessage(message: string) {
   Alert.alert("Success", message);
 }
 
+type Theme = (typeof AppTheme)["light"];
+
 export default function EntryScreen() {
   const { signIn, signUp } = useSession();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [mode, setMode] = useState<AuthMode>("login");
   const [rememberMe, setRememberMe] = useState(true);
   const [visiblePasswords, setVisiblePasswords] = useState<
@@ -76,9 +82,10 @@ export default function EntryScreen() {
 
   const isLogin = mode === "login";
   const title = isLogin
-    ? "Go ahead and set up\nyour account"
-    : "Create your\naccount";
-  const subtitle = "Sign in-up to enjoy the best managing experience";
+    ? "Welcome back to\nyour attendance hub"
+    : "Create your\nsmart campus account";
+  const subtitle =
+    "Sign in or create an account to manage attendance with ease.";
   const fields = isLogin ? loginFields : registerFields;
 
   useEffect(() => {
@@ -211,10 +218,19 @@ export default function EntryScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.screen}>
         <View style={styles.hero}>
+          <View style={styles.heroMeshTop} />
+          <View style={styles.heroMeshBottom} />
           <View style={styles.heroGlowLarge} />
           <View style={styles.heroGlowSmall} />
 
           <View style={styles.heroTextBlock}>
+            <View style={styles.eyebrowChip}>
+              <Text style={styles.eyebrowText}>
+                {isLogin
+                  ? "Attendance, simplified"
+                  : "Fast setup, smooth access"}
+              </Text>
+            </View>
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.subtitle}>{subtitle}</Text>
           </View>
@@ -264,10 +280,14 @@ export default function EntryScreen() {
           >
             {fields.map((field) => (
               <View key={field.placeholder} style={styles.inputShell}>
-                <Ionicons name={field.icon} size={18} color="#1642a8ff" />
+                <Ionicons
+                  name={field.icon}
+                  size={18}
+                  color={theme.colors.accentStrong}
+                />
                 <TextInput
                   placeholder={field.placeholder}
-                  placeholderTextColor="#8D98AE"
+                  placeholderTextColor={theme.colors.subtleText}
                   autoCapitalize="none"
                   autoCorrect={false}
                   secureTextEntry={
@@ -299,7 +319,7 @@ export default function EntryScreen() {
                           : "eye-off-outline"
                       }
                       size={20}
-                      color="#8D98AE"
+                      color={theme.colors.mutedText}
                     />
                   </Pressable>
                 ) : null}
@@ -312,9 +332,16 @@ export default function EntryScreen() {
                   <Switch
                     value={rememberMe}
                     onValueChange={setRememberMe}
-                    trackColor={{ false: "#D8DEEA", true: "#BFD1FF" }}
-                    thumbColor={rememberMe ? "#2F66E7" : "#FFFFFF"}
-                    ios_backgroundColor="#D8DEEA"
+                    trackColor={{
+                      false: theme.colors.border,
+                      true: theme.colors.accentSoft,
+                    }}
+                    thumbColor={
+                      rememberMe
+                        ? theme.colors.accentStrong
+                        : theme.colors.surfaceElevated
+                    }
+                    ios_backgroundColor={theme.colors.border}
                     style={styles.switch}
                   />
                   <Text style={styles.rememberText}>Remember me</Text>
@@ -348,202 +375,208 @@ export default function EntryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#16213A",
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: "#16213A",
-  },
-  hero: {
-    height: 332,
-    backgroundColor: "#16213A",
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    overflow: "hidden",
-  },
-  heroGlowLarge: {
-    position: "absolute",
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: "#2A3550",
-    top: -28,
-    right: -86,
-    opacity: 0.95,
-  },
-  heroGlowSmall: {
-    position: "absolute",
-    width: 186,
-    height: 186,
-    borderRadius: 93,
-    backgroundColor: "#202B44",
-    top: 12,
-    right: 26,
-    opacity: 0.85,
-  },
-  heroTextBlock: {
-    marginTop: 52,
-    width: "78%",
-  },
-  title: {
-    fontSize: 38,
-    lineHeight: 44,
-    fontWeight: "700",
-    color: "#F8FAFC",
-    letterSpacing: -1,
-  },
-  subtitle: {
-    marginTop: 12,
-    fontSize: 13,
-    lineHeight: 20,
-    color: "#9FAAC1",
-  },
-  sheet: {
-    flex: 1,
-    marginTop: -50,
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 34,
-    borderTopRightRadius: 34,
-    paddingHorizontal: 22,
-    marginBottom: -60,
-    paddingBottom: 10,
-    paddingTop: 18,
-  },
-  segmentedControl: {
-    flexDirection: "row",
-    backgroundColor: "#E8EDF5",
-    borderRadius: 22,
-    padding: 4,
-  },
-  segment: {
-    flex: 1,
-    height: 46,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  segmentActive: {
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#90A3C8",
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
-  },
-  segmentLabel: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#75819A",
-  },
-  segmentLabelActive: {
-    color: "#1F2937",
-    fontWeight: "600",
-  },
-  formContent: {
-    paddingTop: 22,
-    paddingBottom: 36,
-    gap: 14,
-  },
-  inputShell: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#E4EAF4",
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    height: 56,
-    backgroundColor: "#FFFFFF",
-  },
-  input: {
-    flex: 1,
-    color: "#1E293B",
-    fontSize: 15,
-  },
-  loginMetaRow: {
-    marginTop: 2,
-    marginBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  rememberRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginLeft: -6,
-  },
-  switch: {
-    transform: [{ scaleX: 0.72 }, { scaleY: 0.72 }],
-  },
-  rememberText: {
-    marginLeft: -2,
-    color: "#7A869B",
-    fontSize: 13,
-  },
-  linkText: {
-    color: "#1642a8ff",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  primaryButton: {
-    marginTop: 4,
-    height: 56,
-    borderRadius: 30,
-    backgroundColor: "#1642a8ff",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#2F66E7",
-    shadowOpacity: 0.28,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
-  },
-  primaryButtonDisabled: {
-    opacity: 0.7,
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  dividerRow: {
-    marginTop: 18,
-    marginBottom: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#E5EAF3",
-  },
-  dividerText: {
-    fontSize: 12,
-    color: "#94A0B4",
-  },
-  socialRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  socialButton: {
-    flex: 1,
-    height: 54,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#E5EAF3",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    backgroundColor: "#FFFFFF",
-  },
-  socialButtonText: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#334155",
-  },
-});
+function createStyles(theme: Theme) {
+  const isDark = theme.colors.background === AppTheme.dark.colors.background;
+
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    hero: {
+      height: 340,
+      backgroundColor: "#16213A",
+      paddingHorizontal: 24,
+      paddingTop: 8,
+      overflow: "hidden",
+    },
+    heroMeshTop: {
+      position: "absolute",
+      width: 340,
+      height: 340,
+      borderRadius: 170,
+      backgroundColor: "rgba(42, 53, 80, 0.2)",
+      top: -170,
+      left: -90,
+    },
+    heroMeshBottom: {
+      position: "absolute",
+      width: 280,
+      height: 280,
+      borderRadius: 140,
+      backgroundColor: "rgba(32, 43, 68, 0.24)",
+      bottom: -130,
+      left: 40,
+    },
+    heroGlowLarge: {
+      position: "absolute",
+      width: 250,
+      height: 250,
+      borderRadius: 125,
+      backgroundColor: "#2A3550",
+      top: -28,
+      right: -86,
+      opacity: 0.95,
+    },
+    heroGlowSmall: {
+      position: "absolute",
+      width: 186,
+      height: 186,
+      borderRadius: 93,
+      backgroundColor: "#202B44",
+      top: 22,
+      right: 18,
+      opacity: 0.85,
+    },
+    heroTextBlock: {
+      marginTop: 48,
+      width: "80%",
+    },
+    eyebrowChip: {
+      alignSelf: "flex-start",
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: theme.radius.pill,
+      backgroundColor: "rgba(255, 255, 255, 0.08)",
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.1)",
+    },
+    eyebrowText: {
+      ...theme.typography.eyebrow,
+      color: "#F8FAFC",
+      letterSpacing: 0.8,
+    },
+    title: {
+      marginTop: 18,
+      fontSize: 38,
+      lineHeight: 44,
+      fontWeight: "800",
+      color: "#F8FAFC",
+      letterSpacing: -1.1,
+    },
+    subtitle: {
+      marginTop: 12,
+      fontSize: 14,
+      lineHeight: 21,
+      color: "#9FAAC1",
+    },
+    sheet: {
+      flex: 1,
+      marginTop: -58,
+      backgroundColor: theme.colors.surfaceElevated,
+      borderTopLeftRadius: 34,
+      borderTopRightRadius: 34,
+      paddingHorizontal: 22,
+      marginBottom: -60,
+      paddingBottom: 10,
+      paddingTop: 18,
+      borderWidth: isDark ? 1 : 0,
+      borderColor: isDark ? theme.colors.borderSoft : "transparent",
+      ...theme.shadow.card,
+    },
+    segmentedControl: {
+      flexDirection: "row",
+      backgroundColor: theme.colors.surfaceMuted,
+      borderRadius: 22,
+      padding: 4,
+      borderWidth: 1,
+      borderColor: theme.colors.borderSoft,
+    },
+    segment: {
+      flex: 1,
+      height: 46,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    segmentActive: {
+      backgroundColor: theme.colors.surfaceElevated,
+      shadowColor: isDark ? "#000000" : "#90A3C8",
+      shadowOpacity: isDark ? 0.22 : 0.2,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 3,
+    },
+    segmentLabel: {
+      fontSize: 15,
+      fontWeight: "500",
+      color: theme.colors.mutedText,
+    },
+    segmentLabelActive: {
+      color: theme.colors.heading,
+      fontWeight: "700",
+    },
+    formContent: {
+      paddingTop: 22,
+      paddingBottom: 36,
+      gap: 14,
+    },
+    inputShell: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 18,
+      paddingHorizontal: 16,
+      height: 58,
+      backgroundColor: theme.colors.card,
+    },
+    input: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 15,
+    },
+    loginMetaRow: {
+      marginTop: 2,
+      marginBottom: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    rememberRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginLeft: -6,
+    },
+    switch: {
+      transform: [{ scaleX: 0.72 }, { scaleY: 0.72 }],
+    },
+    rememberText: {
+      marginLeft: -2,
+      color: theme.colors.mutedText,
+      fontSize: 13,
+    },
+    linkText: {
+      color: theme.colors.accentStrong,
+      fontSize: 13,
+      fontWeight: "700",
+    },
+    primaryButton: {
+      marginTop: 8,
+      height: 58,
+      borderRadius: theme.radius.pill,
+      backgroundColor: theme.colors.accentStrong,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: isDark ? "#000000" : theme.colors.accentStrong,
+      shadowOpacity: isDark ? 0.28 : 0.24,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
+    },
+    primaryButtonDisabled: {
+      opacity: 0.72,
+    },
+    primaryButtonText: {
+      color: theme.colors.accentContrast,
+      fontSize: 16,
+      fontWeight: "800",
+      letterSpacing: 0.2,
+    },
+  });
+}

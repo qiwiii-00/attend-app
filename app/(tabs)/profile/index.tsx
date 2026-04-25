@@ -212,6 +212,30 @@ export default function ProfileTabScreen() {
     }
   }
 
+  function confirmLogout() {
+    if (loggingOut) {
+      return;
+    }
+
+    Alert.alert(
+      "Sign out?",
+      "You will need to sign in again to access your account.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Logout",
+          style: "destructive",
+          onPress: () => {
+            void handleLogout();
+          },
+        },
+      ],
+    );
+  }
+
   const settingsItems: ActionItem[] = [
     {
       icon: "create-outline",
@@ -227,7 +251,7 @@ export default function ProfileTabScreen() {
       tint: theme.colors.accentStrong,
       backgroundColor: theme.colors.surfaceMuted,
       disabled: loggingOut,
-      onPress: handleLogout,
+      onPress: confirmLogout,
     },
   ];
 
