@@ -232,7 +232,6 @@ export default function EntryScreen() {
               </Text>
             </View>
             <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
           </View>
         </View>
 
@@ -388,10 +387,10 @@ function createStyles(theme: Theme) {
       backgroundColor: theme.colors.background,
     },
     hero: {
-      height: 340,
+      height: 320,
       backgroundColor: "#16213A",
       paddingHorizontal: 24,
-      paddingTop: 8,
+      paddingTop: 2,
       overflow: "hidden",
     },
     heroMeshTop: {
@@ -452,7 +451,7 @@ function createStyles(theme: Theme) {
     },
     title: {
       marginTop: 18,
-      fontSize: 38,
+      fontSize: 32,
       lineHeight: 44,
       fontWeight: "800",
       color: "#F8FAFC",
@@ -466,7 +465,7 @@ function createStyles(theme: Theme) {
     },
     sheet: {
       flex: 1,
-      marginTop: -58,
+      marginTop: -88,
       backgroundColor: theme.colors.surfaceElevated,
       borderTopLeftRadius: 34,
       borderTopRightRadius: 34,
@@ -524,7 +523,9 @@ function createStyles(theme: Theme) {
       borderRadius: 18,
       paddingHorizontal: 16,
       height: 58,
-      backgroundColor: theme.colors.card,
+      backgroundColor: isDark
+        ? theme.colors.surfaceMuted
+        : theme.colors.card,
     },
     input: {
       flex: 1,

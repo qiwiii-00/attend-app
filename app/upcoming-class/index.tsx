@@ -195,7 +195,7 @@ function getItemColors(theme: Theme, state: ScheduleItem["state"]) {
     return {
       line: theme.colors.border,
       iconBg: theme.colors.accentStrong,
-      cardBg: theme.colors.accentSoft,
+      cardBg: theme.colors.card,
       text: theme.colors.heading,
       muted: theme.colors.mutedText,
     };
@@ -205,7 +205,7 @@ function getItemColors(theme: Theme, state: ScheduleItem["state"]) {
     return {
       line: theme.colors.border,
       iconBg: theme.colors.surfaceMuted,
-      cardBg: theme.colors.surfaceMuted,
+      cardBg: theme.colors.card,
       text: theme.colors.subtleText,
       muted: theme.colors.subtleText,
     };

@@ -7,10 +7,11 @@ import {
 } from "@react-navigation/native";
 import { Stack, useRootNavigationState, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { PropsWithChildren, useEffect } from "react";
+import { PropsWithChildren, useEffect, useMemo } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
+import { AppTheme } from "@/constants/theme";
 import { AuthProvider, getPostAuthRoute, useSession } from "@/lib/auth-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
@@ -30,11 +31,11 @@ function AuthGate({ children }: PropsWithChildren) {
     }
 
     const firstSegment = segments[0];
-    const onIndex = firstSegment === "index";
-    const inTabs = firstSegment === "(tabs)";
+    const onIndex = segments.length === 0 || firstSegment === "index";
     const inProfileReg = firstSegment === "profile-reg";
+    const isProtectedRoute = !onIndex;
 
-    if (!user && (inTabs || inProfileReg)) {
+    if (!user && isProtectedRoute) {
       router.replace("/");
       return;
     }
@@ -58,19 +59,41 @@ function AuthGate({ children }: PropsWithChildren) {
 
 function AppNavigator() {
   const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const appTheme = isDark ? AppTheme.dark : AppTheme.light;
+  const navigationTheme = useMemo(
+    () => ({
+      ...(isDark ? DarkTheme : DefaultTheme),
+      colors: {
+        ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+        background: appTheme.colors.background,
+        card: appTheme.colors.background,
+        text: appTheme.colors.text,
+        border: appTheme.colors.border,
+        primary: appTheme.colors.accentStrong,
+      },
+    }),
+    [appTheme.colors.accentStrong, appTheme.colors.background, appTheme.colors.border, appTheme.colors.text, isDark],
+  );
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
+    <ThemeProvider value={navigationTheme}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: appTheme.colors.background },
+        }}
+      >
         <Stack.Screen name="index" />
         <Stack.Screen name="profile-reg" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="scanner" />
         <Stack.Screen
           name="modal"
           options={{ headerShown: true, presentation: "modal", title: "Modal" }}
         />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style={isDark ? "light" : "dark"} />
     </ThemeProvider>
   );
 }

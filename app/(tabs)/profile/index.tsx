@@ -339,13 +339,6 @@ export default function ProfileTabScreen() {
                       <Text style={styles.itemLabel}>{item.label}</Text>
                       <Text style={styles.itemValue}>{item.value}</Text>
                     </View>
-                    <View style={styles.chevronWrap}>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={16}
-                        color={theme.colors.mutedText}
-                      />
-                    </View>
                   </View>
                 ))}
               </View>
