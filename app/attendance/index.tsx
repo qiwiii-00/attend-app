@@ -31,6 +31,10 @@ import {
   getAttendanceSessions,
   type AttendanceSessionRecord,
 } from "@/lib/api/attendance-session-service";
+import {
+  getPeriodsByContext,
+  type PeriodRecord,
+} from "@/lib/api/period-service";
 import { MonthlySubjectAttendanceCard } from "@/components/monthly-subject-attendance-card";
 import { useSession } from "@/lib/auth-context";
 
@@ -59,7 +63,26 @@ type AttendanceSummaryTotals = {
   absent: number;
 };
 
+type TodaySubjectStatus = "present" | "late" | "absent" | "not_marked";
+
+type TodaySubjectItem = {
+  id: number;
+  subjectName: string;
+  timeLabel: string;
+  status: TodaySubjectStatus;
+};
+
 type Theme = (typeof AppTheme)["light"];
+
+const WEEKDAY_KEYS = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const;
 
 function getAttendanceDate(attendance: AttendanceRecord) {
   const parsed = new Date(attendance.scanned_at ?? attendance.created_at);
@@ -172,6 +195,63 @@ function formatApiDate(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function getWeekdayKey(date: Date) {
+  return WEEKDAY_KEYS[date.getDay()];
+}
+
+function sortPeriods(periods: PeriodRecord[]) {
+  return [...periods].sort((left, right) =>
+    left.start_time.localeCompare(right.start_time),
+  );
+}
+
+function buildTodaySubjectItems(
+  periods: PeriodRecord[],
+  attendances: AttendanceRecord[],
+  sessionMap: Map<number, AttendanceSessionRecord>,
+) {
+  const todayKey = formatApiDate(new Date());
+  const weekday = getWeekdayKey(new Date());
+
+  const attendanceByPeriodId = new Map<number, TodaySubjectStatus>();
+
+  for (const attendance of attendances) {
+    const date = getAttendanceDate(attendance);
+    const session = sessionMap.get(attendance.attendance_session_id);
+
+    if (!date || !session?.period_id || formatApiDate(date) !== todayKey) {
+      continue;
+    }
+
+    const status =
+      attendance.status === "present" || attendance.status === "late"
+        ? attendance.status
+        : "absent";
+
+    attendanceByPeriodId.set(session.period_id, status);
+  }
+
+  return sortPeriods(periods)
+    .map((period) => {
+      const subjects = period.subjects ?? [];
+      const subject =
+        subjects.find((item) => item.day_of_week === weekday) ??
+        subjects.find((item) => item.day_of_week === null);
+
+      if (!period.is_active || !subject?.is_active) {
+        return null;
+      }
+
+      return {
+        id: period.id,
+        subjectName: subject.name || period.name,
+        timeLabel: `${period.start_time.slice(0, 5)} - ${period.end_time.slice(0, 5)}`,
+        status: attendanceByPeriodId.get(period.id) ?? "not_marked",
+      } satisfies TodaySubjectItem;
+    })
+    .filter((item): item is TodaySubjectItem => item !== null);
+}
+
 function getSelectedRangeMeta(range: SummaryRange) {
   const today = new Date();
 
@@ -243,6 +323,7 @@ export default function AttendanceScreen() {
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
   const [sessions, setSessions] = useState<AttendanceSessionRecord[]>([]);
+  const [periods, setPeriods] = useState<PeriodRecord[]>([]);
   const [selectedRange, setSelectedRange] = useState<SummaryRange>("Day");
   const [summaryTotals, setSummaryTotals] = useState<AttendanceSummaryTotals>({
     total: 0,
@@ -261,9 +342,11 @@ export default function AttendanceScreen() {
       }
 
       try {
-        const [attendanceResponse, sessionResponse] = await Promise.all([
+        const [attendanceResponse, sessionResponse, periodResponse] =
+          await Promise.all([
           getAttendances(),
           getAttendanceSessions(),
+          getPeriodsByContext({ user_id: user.id }),
         ]);
 
         setAttendances(
@@ -274,6 +357,7 @@ export default function AttendanceScreen() {
             ),
         );
         setSessions(sessionResponse.data);
+        setPeriods(periodResponse.data.periods);
       } catch (error) {
         if (!(error instanceof ApiError)) {
           Alert.alert("Load failed", "Unable to load attendance details.");
@@ -328,6 +412,10 @@ export default function AttendanceScreen() {
   }, [selectedRange, user]);
 
   const sessionMap = useMemo(() => getSessionMap(sessions), [sessions]);
+  const todaySubjectItems = useMemo(
+    () => buildTodaySubjectItems(periods, attendances, sessionMap),
+    [periods, attendances, sessionMap],
+  );
   const subjectSummary = useMemo(() => {
     const monthlyAttendances = attendances.filter((attendance) => {
       const date = getAttendanceDate(attendance);
@@ -469,6 +557,55 @@ export default function AttendanceScreen() {
                   <Text style={styles.statLabel}>Absent</Text>
                 </View>
               </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Today&apos;s subjects</Text>
+              {todaySubjectItems.length > 0 ? (
+                todaySubjectItems.map((item) => {
+                  const colors =
+                    item.status === "not_marked"
+                      ? {
+                          bg: theme.colors.surfaceMuted,
+                          fg: theme.colors.mutedText,
+                          label: "Not marked",
+                        }
+                      : getStatusColors(theme, item.status);
+
+                  return (
+                    <View key={item.id} style={styles.todayRow}>
+                      <View style={styles.todayRowText}>
+                        <Text style={styles.todaySubjectName}>
+                          {item.subjectName}
+                        </Text>
+                        <Text style={styles.todaySubjectTime}>
+                          {item.timeLabel}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.todayStatusPill,
+                          { backgroundColor: colors.bg },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.todayStatusText, { color: colors.fg }]}
+                        >
+                          {colors.label}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyTitle}>No classes scheduled today</Text>
+                  <Text style={styles.emptyCopy}>
+                    Today&apos;s subject list will appear here when your timetable
+                    has active periods for this day.
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.section}>
@@ -651,6 +788,40 @@ function createStyles(theme: Theme) {
     },
     section: {
       gap: 12,
+    },
+    todayRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      borderRadius: 18,
+      backgroundColor: theme.colors.card,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    todayRowText: {
+      flex: 1,
+      gap: 4,
+    },
+    todaySubjectName: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: theme.colors.heading,
+    },
+    todaySubjectTime: {
+      fontSize: 13,
+      color: theme.colors.mutedText,
+    },
+    todayStatusPill: {
+      borderRadius: theme.radius.pill,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    todayStatusText: {
+      fontSize: 12,
+      fontWeight: "800",
     },
     sectionTitle: {
       fontSize: 20,

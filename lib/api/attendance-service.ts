@@ -3,7 +3,7 @@ import { apiClient } from "@/lib/api/apiClient";
 export const ATTENDANCE_API_ROUTES = {
   attendances: "/attendances",
   attendanceById: (id: number | string) => `/attendances/${id}`,
-  userSummary: "/attendance/user-summary",
+  userSummary: "/attendances/user-summary",
   scanStatic: "/attendance/scan-static",
 } as const;
 
