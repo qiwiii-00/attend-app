@@ -40,7 +40,7 @@ export class ApiError extends Error {
   }
 }
 
-const DEFAULT_BASE_URL = "http://192.168.1.46:8000/api";
+const DEFAULT_BASE_URL = "https://attend.lengzem.in/api";
 
 let authToken: string | null = null;
 
