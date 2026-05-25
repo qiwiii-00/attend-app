@@ -6,7 +6,7 @@ import {
 } from "expo-camera";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -34,6 +34,9 @@ export default function ScannerScreen() {
   const [hasScanned, setHasScanned] = useState(false);
   const [scannedValue, setScannedValue] = useState<string | null>(null);
   const [isSubmittingScan, setIsSubmittingScan] = useState(false);
+  const [hasLocationPermission, setHasLocationPermission] = useState<
+    boolean | null
+  >(null);
   const [scanResultMessage, setScanResultMessage] = useState<string | null>(
     null,
   );
@@ -60,13 +63,52 @@ export default function ScannerScreen() {
     () => createStyles(theme, compactLayout),
     [compactLayout, theme],
   );
+  const cameraGranted = permission?.granted ?? false;
+  const locationGranted = hasLocationPermission === true;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function requestScreenPermissions() {
+      const cameraPermission = await requestPermission();
+
+      if (!isMounted || !cameraPermission.granted) {
+        return;
+      }
+
+      const locationPermission =
+        await Location.requestForegroundPermissionsAsync();
+
+      if (isMounted) {
+        setHasLocationPermission(locationPermission.status === "granted");
+      }
+    }
+
+    void requestScreenPermissions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [requestPermission]);
 
   function handleClose() {
     router.replace("/(tabs)/home");
   }
 
+  async function handlePermissionRetry() {
+    const cameraPermission = await requestPermission();
+
+    if (!cameraPermission.granted) {
+      return;
+    }
+
+    const locationPermission =
+      await Location.requestForegroundPermissionsAsync();
+    setHasLocationPermission(locationPermission.status === "granted");
+  }
+
   async function handleBarcodeScanned(result: BarcodeScanningResult) {
-    if (hasScanned || isSubmittingScan) {
+    if (hasScanned || isSubmittingScan || !cameraGranted || !locationGranted) {
       return;
     }
 
@@ -74,13 +116,6 @@ export default function ScannerScreen() {
       setHasScanned(true);
       setIsSubmittingScan(true);
       setScannedValue(result.data);
-
-      const locationPermission =
-        await Location.requestForegroundPermissionsAsync();
-
-      if (locationPermission.status !== "granted") {
-        throw new Error("Location permission is required to scan attendance QR.");
-      }
 
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
@@ -109,7 +144,7 @@ export default function ScannerScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.screen}>
-        {permission?.granted ? (
+        {cameraGranted ? (
           <CameraView
             style={StyleSheet.absoluteFillObject}
             facing="back"
@@ -197,7 +232,7 @@ export default function ScannerScreen() {
           </View>
 
           <View style={styles.bottom}>
-            {!permission?.granted ? (
+            {!cameraGranted || hasLocationPermission === false ? (
               <View style={styles.resultCard}>
                 <View style={styles.permissionRow}>
                   <CircleAlert
@@ -206,17 +241,23 @@ export default function ScannerScreen() {
                     strokeWidth={2.2}
                   />
                   <Text style={styles.resultTitle}>
-                    Camera permission required
+                    {!cameraGranted
+                      ? "Camera permission required"
+                      : "Location permission required"}
                   </Text>
                 </View>
                 <Text style={styles.resultValue}>
-                  Allow camera access to scan the QR code.
+                  {!cameraGranted
+                    ? "Allow camera access to scan the QR code."
+                    : "Allow location access to validate and mark attendance."}
                 </Text>
                 <Pressable
                   style={styles.primaryButton}
-                  onPress={requestPermission}
+                  onPress={handlePermissionRetry}
                 >
-                  <Text style={styles.primaryButtonText}>Allow Camera</Text>
+                  <Text style={styles.primaryButtonText}>
+                    {!cameraGranted ? "Allow Camera" : "Allow Location"}
+                  </Text>
                 </Pressable>
               </View>
             ) : isSubmittingScan ? (
