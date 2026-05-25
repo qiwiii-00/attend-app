@@ -11,9 +11,13 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { AppTheme } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/use-app-theme";
@@ -24,13 +28,37 @@ type Theme = (typeof AppTheme)["light"];
 
 export default function ScannerScreen() {
   const theme = useAppTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const [permission, requestPermission] = useCameraPermissions();
   const [hasScanned, setHasScanned] = useState(false);
   const [scannedValue, setScannedValue] = useState<string | null>(null);
   const [isSubmittingScan, setIsSubmittingScan] = useState(false);
   const [scanResultMessage, setScanResultMessage] = useState<string | null>(
     null,
+  );
+  const compactLayout = height < 760;
+  const frameSize = useMemo(() => {
+    const horizontalPadding = theme.spacing.lg * 2;
+    const availableWidth = width - horizontalPadding - 24;
+    const reservedHeight = compactLayout ? 320 : 376;
+    const availableHeight =
+      height - insets.top - insets.bottom - reservedHeight;
+
+    return Math.max(160, Math.min(252, availableWidth, availableHeight));
+  }, [
+    compactLayout,
+    height,
+    insets.bottom,
+    insets.top,
+    theme.spacing.lg,
+    width,
+  ]);
+  const frameCornerSize = frameSize < 190 ? 28 : 36;
+  const frameCornerOffset = frameSize < 190 ? 10 : 12;
+  const styles = useMemo(
+    () => createStyles(theme, compactLayout),
+    [compactLayout, theme],
   );
 
   function handleClose() {
@@ -79,7 +107,7 @@ export default function ScannerScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.screen}>
         {permission?.granted ? (
           <CameraView
@@ -106,11 +134,66 @@ export default function ScannerScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.frame}>
-            <View style={[styles.corner, styles.cornerTopLeft]} />
-            <View style={[styles.corner, styles.cornerTopRight]} />
-            <View style={[styles.corner, styles.cornerBottomLeft]} />
-            <View style={[styles.corner, styles.cornerBottomRight]} />
+          <View style={styles.frameSection}>
+            <View
+              style={[
+                styles.frame,
+                {
+                  width: frameSize,
+                  height: frameSize,
+                  borderRadius: Math.max(22, Math.round(frameSize * 0.11)),
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.corner,
+                  styles.cornerTopLeft,
+                  {
+                    width: frameCornerSize,
+                    height: frameCornerSize,
+                    top: frameCornerOffset,
+                    left: frameCornerOffset,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.corner,
+                  styles.cornerTopRight,
+                  {
+                    width: frameCornerSize,
+                    height: frameCornerSize,
+                    top: frameCornerOffset,
+                    right: frameCornerOffset,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.corner,
+                  styles.cornerBottomLeft,
+                  {
+                    width: frameCornerSize,
+                    height: frameCornerSize,
+                    bottom: frameCornerOffset,
+                    left: frameCornerOffset,
+                  },
+                ]}
+              />
+              <View
+                style={[
+                  styles.corner,
+                  styles.cornerBottomRight,
+                  {
+                    width: frameCornerSize,
+                    height: frameCornerSize,
+                    bottom: frameCornerOffset,
+                    right: frameCornerOffset,
+                  },
+                ]}
+              />
+            </View>
           </View>
 
           <View style={styles.bottom}>
@@ -185,7 +268,7 @@ export default function ScannerScreen() {
   );
 }
 
-function createStyles(theme: Theme) {
+function createStyles(theme: Theme, compactLayout: boolean) {
   const isDark = theme.colors.background === AppTheme.dark.colors.background;
 
   return StyleSheet.create({
@@ -199,13 +282,12 @@ function createStyles(theme: Theme) {
     },
     overlay: {
       flex: 1,
-      justifyContent: "space-between",
       backgroundColor: isDark
         ? "rgba(2, 6, 23, 0.42)"
         : "rgba(4, 10, 28, 0.28)",
       paddingHorizontal: theme.spacing.lg,
-      paddingTop: 18,
-      paddingBottom: 28,
+      paddingTop: compactLayout ? 12 : 18,
+      paddingBottom: compactLayout ? 16 : 24,
     },
     header: {
       flexDirection: "row",
@@ -231,11 +313,15 @@ function createStyles(theme: Theme) {
       alignItems: "center",
       justifyContent: "center",
     },
+    frameSection: {
+      flex: 1,
+      minHeight: 0,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: compactLayout ? 12 : 20,
+    },
     frame: {
       alignSelf: "center",
-      width: 252,
-      height: 252,
-      borderRadius: 28,
       backgroundColor: isDark
         ? "rgba(15, 23, 42, 0.22)"
         : "rgba(255,255,255,0.05)",
@@ -251,29 +337,21 @@ function createStyles(theme: Theme) {
       borderColor: theme.colors.info,
     },
     cornerTopLeft: {
-      top: 12,
-      left: 12,
       borderTopWidth: 4,
       borderLeftWidth: 4,
       borderTopLeftRadius: 14,
     },
     cornerTopRight: {
-      top: 12,
-      right: 12,
       borderTopWidth: 4,
       borderRightWidth: 4,
       borderTopRightRadius: 14,
     },
     cornerBottomLeft: {
-      bottom: 12,
-      left: 12,
       borderBottomWidth: 4,
       borderLeftWidth: 4,
       borderBottomLeftRadius: 14,
     },
     cornerBottomRight: {
-      bottom: 12,
-      right: 12,
       borderBottomWidth: 4,
       borderRightWidth: 4,
       borderBottomRightRadius: 14,
