@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
+import { BarChart } from "react-native-gifted-charts";
 
 import { useAppTheme } from "@/hooks/use-app-theme";
 
@@ -15,22 +16,7 @@ type WeeklyReportCardProps = {
   maxValue?: number;
 };
 
-const CHART_GROWTH_HEIGHT = 160;
-const GRID_TOP_PADDING = 10;
-const GRID_BOTTOM_PADDING = 24;
-
-function getChartHeight(value: number, maxValue: number) {
-  if (maxValue <= 0 || value <= 0) {
-    return 0;
-  }
-
-  const normalized = Math.min(value, maxValue) / maxValue;
-  return normalized * CHART_GROWTH_HEIGHT;
-}
-
-function getScaleLabels(maxValue: number) {
-  return Array.from({ length: maxValue + 1 }, (_, index) => maxValue - index);
-}
+const CHART_HEIGHT = 160;
 
 export function WeeklyReportCard({
   bars,
@@ -38,17 +24,61 @@ export function WeeklyReportCard({
   maxValue,
 }: WeeklyReportCardProps) {
   const theme = useAppTheme();
+  const isDark = theme.colors.background === "#121826";
   const styles = getStyles(theme);
   const maxWeeklyValue = Math.max(
     maxValue ?? Math.max(...bars.map((bar) => bar.value), 1),
     1,
   );
-  const scaleLabels = getScaleLabels(maxWeeklyValue);
   const activeBar =
     bars.find((bar) => bar.isToday) ??
     bars.reduce((maxBar, bar) => {
       return bar.value > maxBar.value ? bar : maxBar;
     }, bars[0]);
+  const chartData = bars.map((bar) => {
+    const isActive = activeBar?.key === bar.key;
+
+    return {
+      value: bar.value,
+      label: bar.label,
+      frontColor: isActive
+        ? isDark
+          ? theme.colors.accent
+          : theme.colors.accentStrong
+        : isDark
+          ? theme.colors.surfaceSoft
+          : theme.colors.accentSoft,
+      barBorderTopLeftRadius: 10,
+      barBorderTopRightRadius: 10,
+      barBorderColor: isActive
+        ? isDark
+          ? theme.colors.heading
+          : theme.colors.accent
+        : "transparent",
+      barBorderWidth: isActive ? 2 : 0,
+      barBorderRadius: 10,
+      labelTextStyle: {
+        color: isActive ? theme.colors.heading : theme.colors.mutedText,
+        fontSize: 12,
+        fontWeight: isActive ? ("700" as const) : ("500" as const),
+      },
+      topLabelComponentHeight: isActive ? 86 : 0,
+      topLabelContainerStyle: isActive ? styles.topLabelContainer : undefined,
+      topLabelComponent: isActive
+        ? () => (
+            <View style={styles.tooltipWrap}>
+              <View style={styles.tooltipCard}>
+                <Text style={styles.tooltipValue}>{bar.value}</Text>
+                <Text style={styles.tooltipLabel}>
+                  {bar.isToday ? "Today" : `${bar.label} report`}
+                </Text>
+              </View>
+              <View style={styles.tooltipDot} />
+            </View>
+          )
+        : undefined,
+    };
+  });
 
   return (
     <View style={styles.card}>
@@ -59,63 +89,33 @@ export function WeeklyReportCard({
         </View>
       </View>
 
-      <View style={styles.chartShell}>
-        <View style={styles.scaleColumn}>
-          {scaleLabels.map((label) => (
-            <View key={label} style={styles.scaleRow}>
-              <Text style={styles.scaleText}>{label}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.chartArea}>
-          <View style={styles.gridOverlay} pointerEvents="none">
-            {scaleLabels.map((label) => (
-              <View key={`grid-${label}`} style={styles.gridRow}>
-                <View style={styles.gridLine} />
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.barsRow}>
-            {bars.map((bar) => {
-              const isActive = activeBar?.key === bar.key;
-
-              return (
-                <View key={bar.key} style={styles.barGroup}>
-                  {isActive ? (
-                    <View style={styles.tooltipWrap}>
-                      <View style={styles.tooltipCard}>
-                        <Text style={styles.tooltipValue}>{bar.value}</Text>
-                        <Text style={styles.tooltipLabel}>
-                          {bar.isToday ? "Today" : `${bar.label} report`}
-                        </Text>
-                      </View>
-                      <View style={styles.tooltipDot} />
-                    </View>
-                  ) : (
-                    <View style={styles.tooltipSpacer} />
-                  )}
-
-                  <View
-                    style={[
-                      styles.bar,
-                      {
-                        height: getChartHeight(bar.value, maxWeeklyValue),
-                      },
-                      isActive ? styles.barActive : styles.barMuted,
-                    ]}
-                  />
-                  <Text
-                    style={[styles.barLabel, isActive && styles.barLabelActive]}
-                  >
-                    {bar.label}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
+      <View style={styles.chartArea}>
+        <BarChart
+          data={chartData}
+          height={CHART_HEIGHT}
+          overflowTop={72}
+          maxValue={maxWeeklyValue}
+          noOfSections={maxWeeklyValue}
+          barWidth={32}
+          spacing={18}
+          initialSpacing={12}
+          endSpacing={12}
+          frontColor={theme.colors.accent}
+          showGradient={false}
+          yAxisTextStyle={styles.scaleText}
+          xAxisLabelTextStyle={styles.barLabel}
+          xAxisColor={theme.colors.borderSoft}
+          yAxisColor={theme.colors.borderSoft}
+          rulesColor={theme.colors.borderSoft}
+          rulesType="solid"
+          yAxisThickness={0}
+          xAxisThickness={1}
+          hideOrigin
+          disablePress
+          isAnimated={false}
+          roundedTop
+          roundedBottom={false}
+        />
       </View>
 
       <Text style={styles.summaryText}>{summaryText}</Text>
@@ -165,72 +165,37 @@ function getStyles(theme: ReturnType<typeof useAppTheme>) {
       fontWeight: "600",
       color: theme.colors.mutedText,
     },
-    chartShell: {
-      flexDirection: "row",
-      marginTop: 14,
-      minHeight: 240,
-    },
-    scaleColumn: {
-      width: 26,
-      paddingTop: GRID_TOP_PADDING,
-      paddingBottom: GRID_BOTTOM_PADDING,
-    },
-    scaleRow: {
-      flex: 1,
-      justifyContent: "center",
-    },
     scaleText: {
       fontSize: 11,
       fontWeight: "600",
       color: theme.colors.subtleText,
     },
     chartArea: {
-      flex: 1,
       borderWidth: 1,
       borderColor: theme.colors.borderSoft,
       borderRadius: 14,
-      paddingHorizontal: 8,
-      paddingTop: 10,
-      paddingBottom: 0,
-      position: "relative",
-      overflow: "hidden",
+      marginTop: 14,
+      paddingHorizontal: 10,
+      paddingTop: 12,
+      paddingBottom: 8,
+      overflow: "visible",
       backgroundColor: theme.colors.surfaceElevated,
-    },
-    gridOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      paddingTop: GRID_TOP_PADDING,
-      paddingBottom: GRID_BOTTOM_PADDING,
-    },
-    gridRow: {
-      flex: 1,
-      justifyContent: "center",
-    },
-    gridLine: {
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.borderSoft,
-    },
-    barsRow: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "flex-end",
-      justifyContent: "space-between",
-      gap: 10,
-      paddingTop: 0,
-    },
-    barGroup: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "flex-end",
-      gap: 8,
+      zIndex: 1,
     },
     tooltipWrap: {
-      height: 74,
+      minHeight: 74,
       alignItems: "center",
       justifyContent: "flex-end",
       marginBottom: 4,
+      zIndex: 30,
+      elevation: 30,
     },
-    tooltipSpacer: {
-      height: 74,
+    topLabelContainer: {
+      width: 120,
+      alignItems: "center",
+      zIndex: 30,
+      elevation: 30,
+      transform: [{ translateX: -44 }],
     },
     tooltipCard: {
       minWidth: 98,
@@ -245,7 +210,8 @@ function getStyles(theme: ReturnType<typeof useAppTheme>) {
       shadowOpacity: isDark ? 0.24 : 0.08,
       shadowRadius: 10,
       shadowOffset: { width: 0, height: 6 },
-      elevation: 2,
+      elevation: 12,
+      zIndex: 31,
     },
     tooltipValue: {
       fontSize: 22,
@@ -263,33 +229,15 @@ function getStyles(theme: ReturnType<typeof useAppTheme>) {
       width: 14,
       height: 14,
       borderRadius: 7,
-      backgroundColor: theme.colors.accent,
+      backgroundColor: isDark ? theme.colors.accent : theme.colors.accentStrong,
       borderWidth: 3,
-      borderColor: theme.colors.accentSoft,
-    },
-    bar: {
-      width: "100%",
-      maxWidth: 44,
-      borderTopLeftRadius: 10,
-      borderTopRightRadius: 10,
-    },
-    barMuted: {
-      backgroundColor: isDark ? theme.colors.surfaceSoft : theme.colors.accentSoft,
-    },
-    barActive: {
-      backgroundColor: theme.colors.accent,
-      borderWidth: 1,
-      borderColor: theme.colors.info,
+      borderColor: isDark ? theme.colors.cardAccent : theme.colors.accentSoft,
+      zIndex: 31,
     },
     barLabel: {
-      paddingBottom: 8,
       fontSize: 12,
       color: theme.colors.mutedText,
       fontWeight: "500",
-    },
-    barLabelActive: {
-      color: theme.colors.heading,
-      fontWeight: "700",
     },
     summaryText: {
       marginTop: 10,

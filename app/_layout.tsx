@@ -1,5 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
+import * as SystemUI from "expo-system-ui";
 import {
   DarkTheme,
   DefaultTheme,
@@ -8,6 +10,7 @@ import {
 import { Stack, useRootNavigationState, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { PropsWithChildren, useEffect, useMemo } from "react";
+import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
@@ -18,6 +21,8 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 export const unstable_settings = {
   initialRouteName: "index",
 };
+
+void SplashScreen.preventAutoHideAsync();
 
 function AuthGate({ children }: PropsWithChildren) {
   const navigationState = useRootNavigationState();
@@ -76,12 +81,17 @@ function AppNavigator() {
     [appTheme.colors.accentStrong, appTheme.colors.background, appTheme.colors.border, appTheme.colors.text, isDark],
   );
 
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync(appTheme.colors.background);
+  }, [appTheme.colors.background]);
+
   return (
     <ThemeProvider value={navigationTheme}>
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: appTheme.colors.background },
+          animation: "fade",
         }}
       >
         <Stack.Screen name="index" />
@@ -100,9 +110,17 @@ function AppNavigator() {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts(Ionicons.font);
+  const colorScheme = useColorScheme();
+  const appTheme = colorScheme === "dark" ? AppTheme.dark : AppTheme.light;
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
 
   if (!fontsLoaded) {
-    return null;
+    return <View style={{ flex: 1, backgroundColor: appTheme.colors.background }} />;
   }
 
   return (

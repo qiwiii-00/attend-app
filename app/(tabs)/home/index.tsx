@@ -81,13 +81,13 @@ type Theme = (typeof AppTheme)["light"];
 
 function normalizeUserResponse(
   value: User | { data?: User } | null | undefined,
-) {
+): User | null {
   if (!value) {
     return null;
   }
 
-  if ("data" in value && value.data) {
-    return value.data;
+  if ("data" in value) {
+    return value.data ?? null;
   }
 
   return value;
